@@ -3,33 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- PWA Settings -->
+
+    <!-- PWA & Application Settings -->
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="หมาหมอยด์">
     <meta name="theme-color" content="#ffffff">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/525qrvD9/IMG-7296.jpg">
     <link rel="icon" type="image/jpeg" href="https://i.postimg.cc/525qrvD9/IMG-7296.jpg">
-    
-    <title>หมาหมอยด์ Premium | แอปพรีเมียมราคาถูก</title>
-    
+
+    <title>หมาหมอยด์ Premium | ร้านจำหน่ายแอปพรีเมียมราคาถูก</title>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- HTML2Canvas (สำหรับบันทึกใบเสร็จเป็นภาพ) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script>
         tailwind.config = {
             theme: {
-                extend: { colors: { primary: '#0284c7', secondary: '#0f172a', background: '#f8fafc' } }
+                extend: {
+                    colors: { primary: '#0284c7', secondary: '#0f172a', background: '#f8fafc' }
+                }
             }
         }
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; color: #0f172a; -webkit-tap-highlight-color: transparent; }
-        
+
+        /* กรอบเลเซอร์ขยับได้ */
         .laser-card { position: relative; overflow: hidden; border-radius: 1rem; background: #ffffff; z-index: 0; }
         .laser-card::before {
             content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
@@ -37,22 +45,29 @@
             animation: rotate 4s linear infinite; opacity: 0; transition: opacity 0.3s; z-index: -2;
         }
         .laser-card:hover::before { opacity: 1; }
-        .laser-card::after { content: ''; position: absolute; inset: 2px; background: #ffffff; border-radius: 0.9rem; z-index: -1; }
+        .laser-card::after {
+            content: ''; position: absolute; inset: 2px; background: #ffffff; border-radius: 0.9rem; z-index: -1;
+        }
         @keyframes rotate { 100% { transform: rotate(360deg); } }
-        
+
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
         .hide-scroll::-webkit-scrollbar { display: none; }
         .loader { border-top-color: #0284c7; animation: spinner 1s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* BUGFIX: "pb-safe" ไม่ใช่ class จริงของ Tailwind (ไม่มีผลใดๆ) จึงเพิ่ม CSS จริงสำหรับ safe-area ของ iOS */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
     </style>
 </head>
 <body class="antialiased pb-24 selection:bg-sky-100">
 
+    <!-- Loading Screen -->
     <div id="loading" class="fixed inset-0 bg-white z-[999] flex flex-col items-center justify-center transition-opacity duration-300">
         <div class="loader rounded-full border-4 border-slate-100 h-12 w-12 mb-3"></div>
-        <p class="text-sm font-medium text-slate-500">กำลังโหลดข้อมูลร้านค้า <i class="fa-solid fa-spinner fa-spin ml-1"></i></p>
+        <p class="text-sm font-medium text-slate-500">กำลังโหลดระบบร้านค้า...</p>
     </div>
 
+    <!-- Header Navigation -->
     <header class="glass fixed top-0 w-full z-40 border-b border-slate-100 shadow-sm">
         <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3 cursor-pointer" onclick="showView('home')">
@@ -67,7 +82,7 @@
                     <i class="fa-solid fa-user text-xs"></i>
                     <span id="user-btn-text" class="text-xs">เข้าสู่ระบบ</span>
                 </button>
-                <button onclick="adminLoginFlow()" class="text-slate-400 hover:text-slate-800 transition p-1"><i class="fa-solid fa-sliders text-base"></i></button>
+                <button onclick="checkAdmin()" class="text-slate-400 hover:text-slate-800 transition p-1"><i class="fa-solid fa-sliders text-base"></i></button>
                 <button onclick="toggleCart()" class="relative text-slate-700 hover:text-primary transition p-2 bg-slate-100 rounded-full">
                     <i class="fa-solid fa-basket-shopping text-base"></i>
                     <span id="cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow hidden">0</span>
@@ -76,8 +91,10 @@
         </div>
     </header>
 
+    <!-- App Container Body -->
     <main id="app-container" class="max-w-5xl mx-auto px-4 pt-20 min-h-screen"></main>
 
+    <!-- Bottom Navigation Bar -->
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-around text-xs text-slate-500 z-30 pb-safe shadow-lg">
         <button onclick="showView('home')" class="flex flex-col items-center py-1 hover:text-primary transition">
             <i class="fa-solid fa-store text-lg mb-1"></i>หน้าแรก
@@ -90,7 +107,7 @@
         </button>
     </nav>
 
-    <!-- Cart Modal -->
+    <!-- Cart Drawer Modal -->
     <div id="cart-modal" class="fixed inset-0 z-50 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleCart()"></div>
         <div class="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300" id="cart-drawer">
@@ -101,10 +118,10 @@
             <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-3 hide-scroll"></div>
             <div class="p-4 border-t bg-white shadow-lg">
                 <div class="flex justify-between items-center mb-4 text-base font-bold">
-                    <span>ยอดรวม</span>
+                    <span>ยอดรวมทั้งหมด</span>
                     <span id="cart-total" class="text-primary text-lg">0 ฿</span>
                 </div>
-                <button onclick="goToCheckout()" class="w-full bg-primary hover:bg-sky-700 text-white py-3 rounded-xl font-medium transition flex items-center justify-center gap-2">
+                <button onclick="goToCheckout()" class="w-full bg-primary hover:bg-sky-700 text-white py-3 rounded-xl font-medium transition shadow-md shadow-sky-100 flex items-center justify-center gap-2">
                     สั่งซื้อสินค้า <i class="fa-solid fa-arrow-right text-xs"></i>
                 </button>
             </div>
@@ -112,62 +129,68 @@
     </div>
 
     <script>
-        // ================= CONFIG =================
+        // ================= CONFIGURATION =================
+        // *** วาง URL ของ Web App จาก Google Apps Script ที่นี่ ***
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQPJmebLc_UYPFUsVJgJl2H0naxu_FMCR4ykTU4z4waZl6yQ4QdhOUiOFIcJGFVJpm/exec";
-        // ==========================================
+        // =================================================
 
-        let globalData = { products: [], settings: {} };
+        let globalData = { products: [], settings: {}, orders: [] };
         let cart = [];
         let currentUser = JSON.parse(localStorage.getItem('hma_user') || 'null');
-        let currentAdminPin = null;
 
-        const formatMoney = (num) => parseFloat(num || 0).toLocaleString('th-TH');
+        // BUGFIX: formatMoney ตอนนี้กัน NaN / ค่าว่าง / ค่าที่แปลงเป็นตัวเลขไม่ได้
+        const formatMoney = (num) => {
+            const n = parseFloat(num);
+            return isNaN(n) ? '0' : n.toLocaleString('th-TH');
+        };
 
+        // BUGFIX: เพิ่มฟังก์ชัน escapeHtml เพื่อป้องกัน XSS
+        // (โค้ดเดิมใส่ค่าจาก backend/ผู้ใช้ เช่น ชื่อสินค้า, อีเมล, ชื่อไฟล์ ลงไปใน innerHTML โดยตรง
+        //  ถ้ามีค่าที่มี < > " ' หรือ & ปนอยู่ อาจทำให้ HTML พัง หรือถูกใช้แทรกสคริปต์ได้)
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // BUGFIX: helper สำหรับปัดเศษเงินให้เป็น 2 ตำแหน่งเสมอ กันปัญหา floating point (เช่น 19.999999999998)
+        function roundMoney(n) {
+            return Math.round((parseFloat(n) || 0) * 100) / 100;
+        }
+
+        // --- Init Function ---
         window.onload = () => {
             checkBrowser();
             updateUserUI();
-            initApp();
-        };
-
-        // --- Core API Caller ---
-        async function apiCall(action, payload = {}) {
-            try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: action, payload: payload }),
-                    headers: { 'Content-Type': 'text/plain' }
-                });
-                const res = await response.json();
-                if (res.status === 'success') return res.data;
-                throw new Error(res.message);
-            } catch (err) {
-                if (WEB_APP_URL === "YOUR_WEB_APP_URL_HERE") throw new Error('กรุณาตั้งค่า URL ของ Web App ในไฟล์ HTML');
-                throw err;
-            }
-        }
-
-        async function initApp() {
-            try {
-                const data = await apiCall('init');
-                globalData = data;
+            fetchData('init', {}, (res) => {
+                // BUGFIX: กันเคส backend ส่งข้อมูลไม่ครบ (products/settings/orders เป็น undefined)
+                // ซึ่งเดิมจะทำให้หน้าเว็บพังตอนเรียก .length หรือ .map ทีหลัง
+                globalData = {
+                    products: (res && res.products) || [],
+                    settings: (res && res.settings) || {},
+                    orders: (res && res.orders) || []
+                };
                 document.getElementById('loading').style.opacity = '0';
                 setTimeout(() => {
                     document.getElementById('loading').style.display = 'none';
                     showView('home');
                     checkPopup();
                 }, 300);
-            } catch (err) {
-                Swal.fire('ข้อผิดพลาด', err.message, 'error');
-            }
-        }
+            });
+        };
 
+        // --- Check Browser & Alert PWA ---
         function checkBrowser() {
             const ua = navigator.userAgent || navigator.vendor || window.opera;
             if (ua.includes("FBAN") || ua.includes("FBAV") || ua.includes("Line")) {
                 Swal.fire({
                     icon: 'info',
                     title: 'คำแนะนำการใช้งาน',
-                    html: 'กรุณากด <i class="fa-solid fa-ellipsis"></i> มุมขวาบน แล้วเลือก<br><b>"เปิดในเบราว์เซอร์ (Safari/Chrome)"</b>',
+                    html: 'เพื่อให้ใช้งานระบบได้สมบูรณ์ กรุณากด <i class="fa-solid fa-ellipsis"></i> มุมขวาบน แล้วเลือก<br><b>"เปิดในเบราว์เซอร์ (Safari / Chrome)"</b>',
                     confirmButtonText: 'รับทราบ',
                     confirmButtonColor: '#0284c7'
                 });
@@ -175,52 +198,78 @@
         }
 
         function checkPopup() {
-            if (!sessionStorage.getItem('popupShown') && globalData.settings.Popup_Message) {
+            // BUGFIX: เดิมเข้าถึง globalData.settings.Popup_Message ตรงๆ ถ้า settings เป็น undefined จะ error
+            if (!sessionStorage.getItem('popupShown') && globalData.settings && globalData.settings.Popup_Message) {
                 Swal.fire({
                     title: globalData.settings.Popup_Message,
                     imageUrl: globalData.settings.Popup_Image || 'https://i.postimg.cc/525qrvD9/IMG-7296.jpg',
                     imageWidth: 200,
-                    confirmButtonText: '<i class="fa-solid fa-door-open"></i> เข้าสู่หน้าเว็บ',
+                    imageAlt: 'Announcement',
+                    confirmButtonText: 'เข้าสู่หน้าเว็บ',
                     confirmButtonColor: '#0284c7'
                 });
                 sessionStorage.setItem('popupShown', 'true');
             }
         }
 
+        // --- Fetch Wrapper ---
+        function fetchData(action, payload, callback) {
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: action, payload: payload }),
+                headers: { 'Content-Type': 'text/plain' }
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === 'success') callback(res.data);
+                else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); hideBtnLoading(); }
+            })
+            .catch(err => {
+                if (WEB_APP_URL === "YOUR_WEB_APP_URL_HERE") {
+                    Swal.fire('ตั้งค่าไม่สมบูรณ์', 'กรุณานำ URL จาก Google Apps Script มาใส่ในไฟล์ index.html', 'error');
+                } else {
+                    Swal.fire('ข้อผิดพลาดการเชื่อมต่อ', err.toString(), 'error');
+                }
+                hideBtnLoading();
+            });
+        }
+
+        // --- Views Router ---
         function showView(viewName, data = null) {
             const container = document.getElementById('app-container');
             window.scrollTo(0, 0);
             if (viewName === 'home') container.innerHTML = renderHome();
             else if (viewName === 'checkout') container.innerHTML = renderCheckout();
+            else if (viewName === 'admin') container.innerHTML = renderAdmin();
             else if (viewName === 'history') container.innerHTML = renderHistory(data);
-            else if (viewName === 'admin') container.innerHTML = renderAdmin(data.products, data.orders);
         }
 
-        // --- Store Front ---
+        // --- Render Home Page ---
         function renderHome() {
             if (!globalData.products || globalData.products.length === 0) {
                 return `<div class="text-center py-20 text-slate-400"><i class="fa-solid fa-box-open text-5xl mb-3"></i><br>ยังไม่มีรายการสินค้าในขณะนี้</div>`;
             }
             let html = `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-12">`;
             globalData.products.forEach(p => {
-                const stockText = p.stockCount > 0 ? `<span class="text-green-600"><i class="fa-solid fa-box text-[10px]"></i> ${p.stockCount} ชิ้น</span>` : `<span class="text-red-500 font-medium">สินค้าหมด</span>`;
+                // BUGFIX: escape ค่าทั้งหมดที่มาจาก backend ก่อนแทรกลง innerHTML (กัน XSS / HTML พัง)
+                const safeId = escapeHtml(p.id);
+                const safeName = escapeHtml(p.name);
+                const safeDuration = escapeHtml(p.duration);
+                const safeImage = escapeHtml(p.image || 'https://via.placeholder.com/200');
                 html += `
                 <div class="laser-card p-3 flex flex-col h-full border border-slate-100 shadow-sm">
                     <div class="w-full h-32 md:h-40 bg-slate-50 rounded-lg overflow-hidden mb-3">
-                        <img src="${p.image || 'https://via.placeholder.com/200'}" class="w-full h-full object-cover">
+                        <img src="${safeImage}" class="w-full h-full object-cover" alt="${safeName}">
                     </div>
-                    <h3 class="font-bold text-slate-800 text-sm md:text-base leading-snug line-clamp-1">${p.name}</h3>
-                    <p class="text-xs text-slate-400 mt-1 flex justify-between">
-                        <span><i class="fa-regular fa-clock mr-1"></i>${p.duration}</span>
-                        ${stockText}
-                    </p>
+                    <h3 class="font-bold text-slate-800 text-sm md:text-base leading-snug line-clamp-1">${safeName}</h3>
+                    <p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-clock mr-1"></i>${safeDuration}</p>
                     <div class="mt-auto pt-3">
                         <div class="flex items-end justify-between mb-3">
                             <span class="text-primary font-bold text-base md:text-lg">${formatMoney(p.price)} ฿</span>
-                            <button onclick="showDetails('${p.id}')" class="text-xs text-slate-400 hover:text-slate-600 underline">รายละเอียด</button>
+                            <button onclick="showDetails('${safeId}')" class="text-xs text-slate-400 hover:text-slate-600 underline">รายละเอียด</button>
                         </div>
-                        <button onclick="addToCart('${p.id}')" ${p.stockCount <= 0 ? 'disabled' : ''} class="w-full ${p.stockCount > 0 ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300'} text-white py-2 rounded-lg text-xs md:text-sm font-medium transition flex items-center justify-center gap-1.5">
-                            <i class="fa-solid ${p.stockCount > 0 ? 'fa-plus' : 'fa-ban'} text-xs"></i> ${p.stockCount > 0 ? 'เพิ่มลงตะกร้า' : 'สินค้าหมด'}
+                        <button onclick="addToCart('${safeId}')" class="w-full bg-slate-900 hover:bg-black text-white py-2 rounded-lg text-xs md:text-sm font-medium transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-plus text-xs"></i> เพิ่มลงตะกร้า
                         </button>
                     </div>
                 </div>`;
@@ -231,64 +280,58 @@
 
         function showDetails(id) {
             const p = globalData.products.find(x => x.id === id);
+            if (!p) return; // BUGFIX: กันเคสหา product ไม่เจอแล้ว p.name จะ error (Cannot read properties of undefined)
             Swal.fire({
-                title: p.name,
-                html: `<div class="text-left text-sm text-slate-600 whitespace-pre-line leading-relaxed">${p.details || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>`,
+                title: escapeHtml(p.name),
+                html: `<div class="text-left text-sm text-slate-600 whitespace-pre-line leading-relaxed">${escapeHtml(p.details) || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>`,
                 confirmButtonText: 'ปิดหน้าต่าง',
                 confirmButtonColor: '#0f172a'
             });
         }
 
-        // --- Cart System ---
+        // --- Cart Management ---
         function addToCart(id) {
             const p = globalData.products.find(x => x.id === id);
-            if (p.stockCount <= 0) return Swal.fire('ข้อผิดพลาด', 'สินค้านี้หมดสต๊อก', 'error');
-
-            const existingItem = cart.find(x => x.id === id);
-            if (existingItem) {
-                if (existingItem.quantity >= p.stockCount) {
-                    return Swal.fire('ข้อความแจ้งเตือน', 'ไม่สามารถเพิ่มได้ สต๊อกไม่เพียงพอ', 'warning');
-                }
-                existingItem.quantity += 1;
-            } else {
-                cart.push({ ...p, quantity: 1, cartId: Date.now() });
-            }
-            
+            if (!p) return; // BUGFIX: กันเคสหา product ไม่เจอ
+            // BUGFIX: เดิมใช้ Date.now() อย่างเดียวเป็น cartId ถ้ากดเพิ่มสินค้าเร็วมากๆ ภายใน 1ms เดียวกัน
+            // จะได้ cartId ซ้ำกัน ทำให้ removeCart ลบสินค้าผิดชิ้น/ลบซ้ำสองชิ้นพร้อมกัน
+            const cartId = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+            cart.push({ ...p, cartId });
             updateCartUI();
             Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว', showConfirmButton: false, timer: 1200 });
         }
 
-        function removeCart(id) {
-            cart = cart.filter(x => x.id !== id);
+        function removeCart(cartId) {
+            cart = cart.filter(x => x.cartId !== cartId);
             updateCartUI();
         }
 
         function updateCartUI() {
             const badge = document.getElementById('cart-badge');
-            const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalQty > 0) { badge.innerText = totalQty; badge.classList.remove('hidden'); }
+            if (cart.length > 0) { badge.innerText = cart.length; badge.classList.remove('hidden'); }
             else { badge.classList.add('hidden'); }
-            
+
             const list = document.getElementById('cart-items');
             if (cart.length === 0) {
                 list.innerHTML = `<div class="text-center text-slate-400 py-12"><i class="fa-solid fa-basket-shopping text-4xl mb-2"></i><br>ไม่มีสินค้าในตะกร้า</div>`;
             } else {
                 let html = ''; let total = 0;
                 cart.forEach(item => {
-                    const itemTotal = parseFloat(item.price) * item.quantity;
-                    total += itemTotal;
+                    total += parseFloat(item.price) || 0;
+                    const safeName = escapeHtml(item.name);
+                    const safeImage = escapeHtml(item.image);
                     html += `
                     <div class="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <img src="${item.image}" class="w-12 h-12 rounded-lg object-cover">
+                        <img src="${safeImage}" class="w-12 h-12 rounded-lg object-cover">
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-xs font-bold text-slate-800 truncate">${item.name}</h4>
-                            <p class="text-xs text-primary font-semibold mt-0.5">${formatMoney(item.price)} ฿ <span class="text-slate-500 font-normal ml-1">x ${item.quantity}</span></p>
+                            <h4 class="text-xs font-bold text-slate-800 truncate">${safeName}</h4>
+                            <p class="text-xs text-primary font-semibold mt-0.5">${formatMoney(item.price)} ฿</p>
                         </div>
-                        <button onclick="removeCart('${item.id}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button>
+                        <button onclick="removeCart('${item.cartId}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button>
                     </div>`;
                 });
                 list.innerHTML = html;
-                document.getElementById('cart-total').innerText = `${formatMoney(total)} ฿`;
+                document.getElementById('cart-total').innerText = `${formatMoney(roundMoney(total))} ฿`;
             }
         }
 
@@ -306,24 +349,23 @@
 
         function goToCheckout() {
             if (cart.length === 0) return Swal.fire('ตะกร้าว่างเปล่า', 'กรุณาเลือกสินค้าอย่างน้อย 1 ชิ้น', 'warning');
-            toggleCart(); 
-            showView('checkout');
+            toggleCart(); showView('checkout');
         }
 
-        // --- Checkout Flow ---
+        // --- Checkout Page ---
         function renderCheckout() {
-            let total = cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
+            let total = roundMoney(cart.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0));
             let userEmail = currentUser ? currentUser.email : '';
             return `
             <div class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-12">
                 <button onclick="showView('home')" class="text-slate-400 mb-4 hover:text-slate-700 text-xs flex items-center gap-1"><i class="fa-solid fa-chevron-left"></i> ย้อนกลับ</button>
-                <h2 class="text-lg font-bold mb-4 border-b pb-2"><i class="fa-solid fa-money-bill-wave text-primary mr-1"></i> ชำระเงินค่าสินค้า</h2>
-                
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">ชำระเงินค่าสินค้า</h2>
+
                 <div class="bg-slate-50 p-4 rounded-xl mb-4 text-center border">
                     <img src="https://i.postimg.cc/DwQdNsRv/IMG-7295.jpg" class="w-44 mx-auto rounded-lg shadow-sm mb-3">
-                    <p class="text-xs font-semibold text-slate-600">ธนาคารกสิกรไทย</p>
+                    <p class="text-xs font-semibold text-slate-600">ธนาคารกสิกรไทย (K-Bank)</p>
                     <p class="text-lg font-bold text-primary tracking-wider my-1">180-1-51296-4</p>
-                    <p class="text-xs text-slate-500">น.ส. วิลาสินี สุร*****</p>
+                    <p class="text-xs text-slate-500">ชื่อบัญชี: น.ส. วิลาสินี สุร*****</p>
                 </div>
 
                 <div class="flex justify-between items-center mb-6 p-3 bg-sky-50 text-sky-900 rounded-xl font-bold text-sm">
@@ -334,14 +376,14 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">อีเมลรับสินค้า <span class="text-red-500">*</span></label>
-                        <input type="email" id="chk-email" value="${userEmail}" class="w-full border rounded-xl p-3 text-sm outline-none focus:border-primary" placeholder="example@email.com">
+                        <input type="email" id="chk-email" value="${escapeHtml(userEmail)}" class="w-full border rounded-xl p-3 text-sm outline-none focus:border-primary" placeholder="example@email.com">
                     </div>
-                    
+
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">แนบหลักฐานการโอน <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">แนบหลักฐานการโอน (สลิป) <span class="text-red-500">*</span></label>
                         <div class="border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:bg-slate-50 transition cursor-pointer" onclick="document.getElementById('slip-upload').click()">
                             <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-1"></i>
-                            <p class="text-xs text-slate-500" id="slip-name">กดเพื่อเลือกรูปภาพ หรือลากมาวาง</p>
+                            <p class="text-xs text-slate-500" id="slip-name">กดเพื่อเลือกรูปภาพ หรือลากสลิปมาวาง</p>
                             <input type="file" id="slip-upload" accept="image/*" class="hidden" onchange="handleFile(this)">
                         </div>
                         <img id="slip-preview" class="hidden mt-3 rounded-xl w-full max-h-56 object-contain bg-slate-50 border">
@@ -358,18 +400,37 @@
         function handleFile(input) {
             const file = input.files[0];
             if (!file) return;
+
+            // BUGFIX: กันเคสไฟล์ไม่ใช่รูปภาพ (บาง browser ให้เลือกไฟล์อื่นได้แม้ accept="image/*")
+            if (!file.type.startsWith('image/')) {
+                Swal.fire('ไฟล์ไม่ถูกต้อง', 'กรุณาเลือกไฟล์รูปภาพเท่านั้น', 'warning');
+                input.value = '';
+                return;
+            }
+
             document.getElementById('slip-name').innerText = file.name;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 const img = new Image();
-                img.onload = function() {
+                img.onload = function () {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
+                    const MAX_WIDTH = 800;
+                    // BUGFIX: โค้ดเดิมคำนวณ scaleSize = MAX_WIDTH / img.width เสมอ
+                    // ถ้ารูปเล็กกว่า 800px อยู่แล้ว จะกลายเป็นการ "ขยาย" ภาพให้ใหญ่ขึ้น (scaleSize > 1)
+                    // ทำให้ภาพแตก/เบลอโดยไม่จำเป็น จึงย่อเฉพาะเมื่อรูปใหญ่กว่า MAX_WIDTH เท่านั้น
+                    let targetWidth = img.width;
+                    let targetHeight = img.height;
+                    if (img.width > MAX_WIDTH) {
+                        const scaleSize = MAX_WIDTH / img.width;
+                        targetWidth = MAX_WIDTH;
+                        targetHeight = img.height * scaleSize;
+                    }
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
                     const ctx = canvas.getContext("2d");
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
                     slipBase64Str = canvas.toDataURL("image/jpeg", 0.7);
-                    
+
                     const preview = document.getElementById('slip-preview');
                     preview.src = slipBase64Str; preview.classList.remove('hidden');
                 }
@@ -378,55 +439,49 @@
             reader.readAsDataURL(file);
         }
 
-        async function submitCheckout() {
-            const email = document.getElementById('chk-email').value;
-            if (!email || !email.includes('@')) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกอีเมลให้ถูกต้อง', 'warning');
-            if (!slipBase64Str) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาแนบสลิปการโอนเงิน', 'warning');
+        function submitCheckout() {
+            const email = document.getElementById('chk-email').value.trim();
+            // BUGFIX: เดิมเช็คแค่ email.includes('@') ซึ่งผ่านได้แม้กรอกแค่ "a@" หรือ "@@@"
+            // เปลี่ยนเป็น regex ตรวจรูปแบบอีเมลที่สมเหตุสมผลกว่า
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email || !emailRegex.test(email)) return Swal.fire('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกอีเมลให้ถูกต้อง', 'warning');
+            if (!slipBase64Str) return Swal.fire('ข้อมูลไม่ครบถ้วน', 'กรุณาแนบสลิปการโอนเงิน', 'warning');
+            if (cart.length === 0) return Swal.fire('ตะกร้าว่างเปล่า', 'ไม่มีสินค้าในตะกร้า กรุณาเลือกสินค้าใหม่อีกครั้ง', 'warning'); // BUGFIX: กันกดยืนยันซ้ำหลังตะกร้าถูกล้างไปแล้ว
 
+            const total = roundMoney(cart.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0));
             const btn = document.getElementById('btn-confirm');
-            btn.disabled = true; 
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบสต๊อกและส่งข้อมูล...';
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งข้อมูล...';
 
-            const payload = { 
-                email: email, 
-                items: cart.map(item => ({ id: item.id, quantity: item.quantity })), 
-                slipBase64: slipBase64Str 
-            };
-            
-            try {
-                const res = await apiCall('checkout', payload);
+            const payload = { email: email, items: cart, total: total, slipBase64: slipBase64Str };
+
+            fetchData('checkout', payload, (res) => {
                 showReceipt(res);
                 cart = []; updateCartUI(); slipBase64Str = "";
-                
-                // Refresh data to update stock count silently
-                apiCall('init').then(data => globalData = data);
-            } catch (err) {
-                Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> ยืนยันการชำระเงิน';
-            }
+            });
         }
 
+        // --- Receipt Display & Download ---
         function showReceipt(orderData) {
-            let itemsHtml = orderData.deliveryItems.map(txt => `<div class="bg-slate-50 border p-2.5 rounded-lg text-xs font-mono mb-2 text-slate-700">${txt}</div>`).join('');
-            
+            const deliveryItems = (orderData && orderData.deliveryItems) || []; // BUGFIX: กัน deliveryItems undefined
+            let itemsHtml = deliveryItems.map(txt => `<div class="bg-slate-50 border p-2.5 rounded-lg text-xs font-mono mb-2 text-slate-700">${escapeHtml(txt)}</div>`).join('');
+
             const html = `
             <div id="receipt-box" class="p-6 bg-white max-w-sm mx-auto rounded-xl border text-left" style="font-family: 'Prompt', sans-serif;">
                 <div class="text-center mb-4">
                     <img src="https://i.postimg.cc/525qrvD9/IMG-7296.jpg" class="w-14 h-14 mx-auto rounded-full mb-2">
                     <h2 class="font-bold text-base">ใบเสร็จรับเงิน</h2>
                     <p class="text-[10px] text-slate-400">หมาหมอยด์ Premium</p>
-                    <p class="text-[10px] text-slate-400 mt-1">รหัสการสั่งซื้อ: ${orderData.orderId}</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Order ID: ${escapeHtml(orderData && orderData.orderId)}</p>
                 </div>
                 <hr class="border-dashed my-3">
                 <div class="mb-3">
-                    <h3 class="font-bold text-xs text-primary mb-2"><i class="fa-solid fa-box"></i> ข้อมูลสินค้า:</h3>
+                    <h3 class="font-bold text-xs text-primary mb-2"><i class="fa-solid fa-box"></i> ข้อมูลสินค้าที่ได้รับ:</h3>
                     ${itemsHtml}
                 </div>
                 <hr class="border-dashed my-3">
-                <p class="text-center text-xs text-slate-400">ระบบได้จัดส่งข้อมูลให้เรียบร้อย ขอบคุณครับ</p>
+                <p class="text-center text-xs text-slate-400">ชำระเงินเรียบร้อยแล้ว ขอบคุณที่ใช้อุดหนุนค่ะ</p>
             </div>
-            <button onclick="downloadReceipt()" class="mt-4 w-full bg-primary text-white py-2.5 rounded-xl font-medium text-xs shadow-sm"><i class="fa-solid fa-download mr-1"></i> บันทึกรูปใบเสร็จ</button>
+            <button onclick="downloadReceipt()" class="mt-4 w-full bg-primary text-white py-2.5 rounded-xl font-medium text-xs shadow-sm"><i class="fa-solid fa-download mr-1"></i> บันทึกใบเสร็จ (.png)</button>
             <button onclick="Swal.close(); showView('home')" class="mt-2 w-full bg-slate-100 text-slate-700 py-2.5 rounded-xl font-medium text-xs">กลับสู่หน้าแรก</button>
             `;
 
@@ -435,6 +490,7 @@
 
         function downloadReceipt() {
             const elm = document.getElementById('receipt-box');
+            if (!elm) return; // BUGFIX: กัน error ถ้า element ยังไม่ถูก render ในโดม
             html2canvas(elm, { scale: 2 }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `receipt-${Date.now()}.png`;
@@ -442,17 +498,22 @@
             });
         }
 
-        // --- User Auth & History ---
+        function hideBtnLoading() {
+            const btn = document.getElementById('btn-confirm');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> ยืนยันการชำระเงิน'; }
+        }
+
+        // --- User Auth System ---
         function updateUserUI() {
             const btnText = document.getElementById('user-btn-text');
-            if(currentUser) btnText.innerText = currentUser.name;
+            if (currentUser) btnText.innerText = currentUser.name;
             else btnText.innerText = 'เข้าสู่ระบบ';
         }
 
         function openAuthModal() {
-            if(currentUser) {
+            if (currentUser) {
                 Swal.fire({
-                    title: currentUser.name,
+                    title: escapeHtml(currentUser.name),
                     text: currentUser.email,
                     icon: 'info',
                     showCancelButton: true,
@@ -460,13 +521,16 @@
                     cancelButtonText: 'ปิด',
                     confirmButtonColor: '#ef4444'
                 }).then(res => {
-                    if(res.isConfirmed) {
+                    if (res.isConfirmed) {
                         localStorage.removeItem('hma_user');
-                        currentUser = null; updateUserUI();
+                        currentUser = null;
+                        updateUserUI();
                         Swal.fire('สำเร็จ', 'ออกจากระบบเรียบร้อย', 'success');
                     }
                 });
-            } else { showLoginModal(); }
+            } else {
+                showLoginModal();
+            }
         }
 
         function showLoginModal() {
@@ -479,21 +543,24 @@
                 `,
                 showCancelButton: true, confirmButtonText: 'เข้าสู่ระบบ', confirmButtonColor: '#0284c7',
                 preConfirm: () => {
-                    return {
-                        email: document.getElementById('auth-email').value,
-                        password: document.getElementById('auth-pass').value
+                    const email = document.getElementById('auth-email').value.trim();
+                    const password = document.getElementById('auth-pass').value;
+                    // BUGFIX: เดิมไม่มีการตรวจสอบก่อนส่ง ทำให้กดยืนยันทั้งที่ยังไม่กรอกอะไรได้
+                    if (!email || !password) {
+                        Swal.showValidationMessage('กรุณากรอกอีเมลและรหัสผ่านให้ครบ');
+                        return false;
                     }
+                    return { email, password };
                 }
-            }).then(async res => {
-                if(res.isConfirmed) {
+            }).then(res => {
+                if (res.isConfirmed) {
                     Swal.showLoading();
-                    try {
-                        const userData = await apiCall('login', res.value);
+                    fetchData('login', res.value, (userData) => {
                         currentUser = userData;
                         localStorage.setItem('hma_user', JSON.stringify(userData));
                         updateUserUI();
-                        Swal.fire('สำเร็จ', `ยินดีต้อนรับคุณ ${userData.name}`, 'success');
-                    } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+                        Swal.fire('สำเร็จ', `ยินดีต้อนรับคุณ ${escapeHtml(userData.name)}`, 'success');
+                    });
                 }
             });
         }
@@ -508,28 +575,32 @@
                 `,
                 showCancelButton: true, confirmButtonText: 'ยืนยันสมัคร', confirmButtonColor: '#0284c7',
                 preConfirm: () => {
-                    return {
-                        name: document.getElementById('reg-name').value,
-                        email: document.getElementById('reg-email').value,
-                        password: document.getElementById('reg-pass').value
+                    const name = document.getElementById('reg-name').value.trim();
+                    const email = document.getElementById('reg-email').value.trim();
+                    const password = document.getElementById('reg-pass').value;
+                    // BUGFIX: เพิ่มการตรวจสอบข้อมูลก่อนส่งสมัครสมาชิก
+                    if (!name || !email || !password) {
+                        Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+                        return false;
                     }
+                    return { name, email, password };
                 }
-            }).then(async res => {
-                if(res.isConfirmed) {
+            }).then(res => {
+                if (res.isConfirmed) {
                     Swal.showLoading();
-                    try {
-                        const userData = await apiCall('register', res.value);
+                    fetchData('register', res.value, (userData) => {
                         currentUser = userData;
                         localStorage.setItem('hma_user', JSON.stringify(userData));
                         updateUserUI();
                         Swal.fire('สำเร็จ', 'สมัครสมาชิกเรียบร้อยแล้ว', 'success');
-                    } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+                    });
                 }
             });
         }
 
-        async function showHistoryView() {
-            if(!currentUser) {
+        // --- Purchase History ---
+        function showHistoryView() {
+            if (!currentUser) {
                 return Swal.fire({
                     title: 'กรุณาเข้าสู่ระบบ',
                     text: 'ต้องเข้าสู่ระบบก่อนจึงจะดูประวัติการสั่งซื้อได้',
@@ -540,24 +611,24 @@
             }
 
             Swal.showLoading();
-            try {
-                const orders = await apiCall('getUserOrders', { email: currentUser.email });
+            fetchData('getUserOrders', { email: currentUser.email }, (orders) => {
                 Swal.close();
                 showView('history', orders);
-            } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+            });
         }
 
         function renderHistory(orders) {
-            if(!orders || orders.length === 0) {
+            if (!orders || orders.length === 0) {
                 return `<div class="max-w-md mx-auto text-center py-20 text-slate-400"><i class="fa-solid fa-clock-rotate-left text-5xl mb-3"></i><br>ยังไม่มีประวัติการสั่งซื้อ</div>`;
             }
             let listHtml = orders.map(o => {
-                let itemsStr = o.items.map(i => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] mr-1 mb-1">${i.name} (x${i.quantity})</span>`).join('');
+                const items = o.items || []; // BUGFIX: กัน o.items undefined ทำให้ .map error
+                let itemsStr = items.map(i => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] mr-1 mb-1">${escapeHtml(i.name)}</span>`).join('');
                 return `
                 <div class="bg-white p-4 rounded-xl border mb-3 shadow-sm">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-xs text-primary"><i class="fa-solid fa-hashtag"></i> ${o.orderId}</span>
-                        <span class="text-[10px] text-slate-400"><i class="fa-regular fa-calendar"></i> ${new Date(o.date).toLocaleDateString('th-TH')}</span>
+                        <span class="font-bold text-xs text-primary">${escapeHtml(o.orderId)}</span>
+                        <span class="text-[10px] text-slate-400">${new Date(o.date).toLocaleDateString('th-TH')}</span>
                     </div>
                     <div class="mb-2">${itemsStr}</div>
                     <div class="flex justify-between items-center text-xs font-bold pt-2 border-t">
@@ -574,91 +645,86 @@
             </div>`;
         }
 
+        // --- Contact Admin Modal ---
         function showContactModal() {
             Swal.fire({
-                title: 'ช่องทางติดต่อ',
+                title: 'ช่องทางติดต่อแอดมิน',
                 html: `
                     <div class="space-y-3 pt-2">
-                        <a href="https://lin.ee/tFXXYbO" target="_blank" class="flex items-center justify-between p-3 bg-emerald-50 text-emerald-800 rounded-xl font-medium text-sm">
-                            <span><i class="fa-brands fa-line text-lg mr-2"></i> สั่งซื้อสินค้า (@323peiau)</span>
+                        <a href="https://lin.ee/tFXXYbO" target="_blank" rel="noopener" class="flex items-center justify-between p-3 bg-emerald-50 text-emerald-800 rounded-xl font-medium text-sm">
+                            <span><i class="fa-brands fa-line text-lg mr-2"></i> ไลน์สั่งซื้อสินค้า (@323peiau)</span>
                             <i class="fa-solid fa-chevron-right text-xs"></i>
                         </a>
-                        <a href="https://lin.ee/OnCi6tO" target="_blank" class="flex items-center justify-between p-3 bg-sky-50 text-sky-800 rounded-xl font-medium text-sm">
-                            <span><i class="fa-solid fa-headset text-lg mr-2"></i> แจ้งปัญหา (@048nmom)</span>
+                        <a href="https://lin.ee/OnCi6tO" target="_blank" rel="noopener" class="flex items-center justify-between p-3 bg-sky-50 text-sky-800 rounded-xl font-medium text-sm">
+                            <span><i class="fa-solid fa-headset text-lg mr-2"></i> ไลน์แจ้งปัญหา (@048nmom)</span>
                             <i class="fa-solid fa-chevron-right text-xs"></i>
                         </a>
                     </div>
                 `,
-                showConfirmButton: false, showCloseButton: true
+                showConfirmButton: false,
+                showCloseButton: true
             });
         }
 
-        // --- Admin Protected Dashboard ---
-        function adminLoginFlow() {
+        // --- Admin Dashboard ---
+        // หมายเหตุ (ความปลอดภัย): PIN ของแอดมินถูกเช็คฝั่ง client เท่านั้น (มองเห็นได้จากซอร์สโค้ด/Network tab)
+        // ควรย้ายการตรวจสอบ PIN ไปทำที่ฝั่ง Google Apps Script (backend) แทน เพื่อไม่ให้ใครก็ตามที่เปิดดูโค้ดสามารถหลบเลี่ยงได้
+        function checkAdmin() {
             Swal.fire({
-                title: 'แผงควบคุมผู้ดูแล',
+                title: 'เข้าสู่ระบบแอดมิน',
                 input: 'password',
                 inputPlaceholder: 'กรอกรหัส PIN',
                 showCancelButton: true,
-                confirmButtonText: 'เข้าสู่ระบบ',
+                confirmButtonText: 'ยืนยัน',
                 confirmButtonColor: '#0f172a'
-            }).then(async (result) => {
+            }).then((result) => {
                 if (result.isConfirmed) {
-                    Swal.showLoading();
-                    try {
-                        await apiCall('adminLogin', { pin: result.value });
-                        currentAdminPin = result.value;
-                        loadAdminData();
-                    } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+                    if (result.value === "1272304") { showView('admin'); }
+                    else { Swal.fire('ผิดพลาด', 'รหัส PIN ไม่ถูกต้อง', 'error'); }
                 }
             });
         }
 
-        async function loadAdminData() {
-            try {
-                const prodData = await apiCall('adminGetProducts', { pin: currentAdminPin });
-                const ordData = await apiCall('adminGetOrders', { pin: currentAdminPin });
-                Swal.close();
-                showView('admin', { products: prodData.products, orders: ordData.orders });
-            } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
-        }
+        function renderAdmin() {
+            const products = globalData.products || []; // BUGFIX: กัน undefined
+            const orders = globalData.orders || [];      // BUGFIX: กัน undefined
+            const settings = globalData.settings || {};  // BUGFIX: กัน undefined
 
-        function renderAdmin(adminProducts, adminOrders) {
-            let pRows = adminProducts.map(p => `
+            let pRows = products.map(p => `
                 <tr class="border-b text-xs">
-                    <td class="p-2"><img src="${p.image}" class="w-8 h-8 rounded object-cover"></td>
-                    <td class="p-2 font-medium">${p.name}</td>
-                    <td class="p-2 text-center">${p.stock ? p.stock.split('\\n').filter(s=>s.trim()).length : 0}</td>
+                    <td class="p-2"><img src="${escapeHtml(p.image)}" class="w-8 h-8 rounded object-cover"></td>
+                    <td class="p-2 font-medium">${escapeHtml(p.name)}</td>
+                    <td class="p-2">${formatMoney(p.price)}</td>
                     <td class="p-2">
-                        <button onclick='editProduct(${JSON.stringify(p)})' class="text-sky-600 mr-2"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="deleteProduct('${p.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick="editProduct('${escapeHtml(p.id)}')" class="text-sky-600 mr-2"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteProduct('${escapeHtml(p.id)}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>`).join('');
 
-            let oRows = adminOrders.map(o => `
+            let oRows = orders.map(o => `
                 <tr class="border-b text-[11px]">
-                    <td class="p-2 font-mono">${o.orderId}</td>
-                    <td class="p-2">${o.email}</td>
-                    <td class="p-2">${o.total}</td>
-                    <td class="p-2"><a href="${o.slip}" target="_blank" class="text-sky-600 underline"><i class="fa-solid fa-image"></i></a></td>
+                    <td class="p-2 font-mono">${escapeHtml(o.orderId)}</td>
+                    <td class="p-2">${escapeHtml(o.email)}</td>
+                    <td class="p-2">${formatMoney(o.total)}</td>
+                    <td class="p-2"><a href="${escapeHtml(o.slip)}" target="_blank" rel="noopener" class="text-sky-600 underline">ดูสลิป</a></td>
                 </tr>`).join('');
 
             return `
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-16">
                 <div class="flex justify-between items-center mb-6 border-b pb-3">
-                    <h2 class="text-base font-bold"><i class="fa-solid fa-sliders text-primary"></i> จัดการร้านค้า</h2>
-                    <button onclick="showView('home')" class="text-xs text-slate-500 border px-3 py-1 rounded-lg">ออก</button>
+                    <h2 class="text-base font-bold"><i class="fa-solid fa-sliders text-primary"></i> แผงควบคุมแอดมิน</h2>
+                    <button onclick="showView('home')" class="text-xs text-slate-500 border px-3 py-1 rounded-lg">ปิด</button>
                 </div>
 
                 <div class="mb-8">
                     <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-xs text-slate-700">คลังสินค้า</h3>
-                        <button onclick="editProduct(null)" class="bg-primary text-white px-3 py-1 rounded-lg text-xs font-medium"><i class="fa-solid fa-plus mr-1"></i>เพิ่มสินค้า</button>
+                        <h3 class="font-bold text-xs text-slate-700">รายการสินค้าในร้าน</h3>
+                        <button onclick="editProduct('')" class="bg-primary text-white px-3 py-1 rounded-lg text-xs font-medium"><i class="fa-solid fa-plus mr-1"></i>เพิ่มสินค้า</button>
                     </div>
                     <div class="overflow-x-auto border rounded-xl">
                         <table class="w-full text-left border-collapse">
                             <thead><tr class="bg-slate-50 text-slate-500 text-xs">
-                                <th class="p-2">รูป</th><th class="p-2">ชื่อ</th><th class="p-2">สต๊อก</th><th class="p-2">จัดการ</th>
+                                <th class="p-2">รูป</th><th class="p-2">ชื่อ</th><th class="p-2">ราคา</th><th class="p-2">จัดการ</th>
                             </tr></thead>
                             <tbody>${pRows}</tbody>
                         </table>
@@ -666,11 +732,11 @@
                 </div>
 
                 <div class="mb-6">
-                    <h3 class="font-bold text-xs text-slate-700 mb-3">ประวัติออเดอร์ล่าสุด</h3>
+                    <h3 class="font-bold text-xs text-slate-700 mb-3">ประวัติการสั่งซื้อล่าสุด</h3>
                     <div class="overflow-x-auto border rounded-xl h-60 overflow-y-auto">
                         <table class="w-full text-left border-collapse">
                             <thead><tr class="bg-slate-50 text-slate-500 text-xs">
-                                <th class="p-2">รหัส</th><th class="p-2">อีเมล</th><th class="p-2">ยอด</th><th class="p-2">สลิป</th>
+                                <th class="p-2">ID</th><th class="p-2">อีเมล</th><th class="p-2">ยอด</th><th class="p-2">สลิป</th>
                             </tr></thead>
                             <tbody>${oRows}</tbody>
                         </table>
@@ -678,47 +744,59 @@
                 </div>
 
                 <div>
-                    <h3 class="font-bold text-xs text-slate-700 mb-3">ตั้งค่า Pop-up เริ่มต้น</h3>
+                    <h3 class="font-bold text-xs text-slate-700 mb-3">ตั้งค่า Pop-up ประกาศ</h3>
                     <div class="space-y-2">
-                        <input id="set-pop-msg" class="w-full border p-2 rounded-lg text-xs" placeholder="ข้อความแจ้งเตือน" value="${globalData.settings.Popup_Message || ''}">
-                        <input id="set-pop-img" class="w-full border p-2 rounded-lg text-xs" placeholder="URL รูปภาพ Pop-up" value="${globalData.settings.Popup_Image || ''}">
-                        <button onclick="saveAdminSettings()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+                        <input id="set-pop-msg" class="w-full border p-2 rounded-lg text-xs" placeholder="ข้อความประกาศ" value="${escapeHtml(settings.Popup_Message || '')}">
+                        <input id="set-pop-img" class="w-full border p-2 rounded-lg text-xs" placeholder="URL รูปภาพ Pop-up" value="${escapeHtml(settings.Popup_Image || '')}">
+                        <button onclick="saveAdminSettings()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs">บันทึกการตั้งค่า Pop-up</button>
                     </div>
                 </div>
             </div>`;
         }
 
-        function editProduct(pData) {
-            let p = pData || {id:'', name:'', duration:'', price:'', image:'', details:'', stock:''};
+        function editProduct(id) {
+            let p = id ? globalData.products.find(x => x.id === id) : { id: '', name: '', duration: '', price: '', image: '', details: '', stock: '' };
+            if (id && !p) { // BUGFIX: กันเคสหา product ไม่เจอ (เช่นข้อมูลถูกลบไปแล้วแต่ตารางยังไม่รีเฟรช)
+                Swal.fire('ไม่พบสินค้า', 'ไม่พบสินค้านี้ในระบบ อาจถูกลบไปแล้ว', 'warning');
+                return;
+            }
             Swal.fire({
-                title: p.id ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่',
+                title: id ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่',
                 html: `
-                    <input id="p-name" class="swal2-input" placeholder="ชื่อสินค้า" value="${p.name}">
-                    <input id="p-dur" class="swal2-input" placeholder="ระยะเวลา" value="${p.duration}">
-                    <input id="p-price" type="number" class="swal2-input" placeholder="ราคา (บาท)" value="${p.price}">
-                    <input id="p-img" class="swal2-input" placeholder="URL รูปภาพสินค้า" value="${p.image}">
-                    <textarea id="p-det" class="swal2-textarea" placeholder="รายละเอียดสินค้า">${p.details}</textarea>
-                    <textarea id="p-stock" class="swal2-textarea" placeholder="ข้อมูลสต๊อก (ใส่บรรทัดละ 1 ชุด)">${p.stock}</textarea>
+                    <input id="p-name" class="swal2-input" placeholder="ชื่อสินค้า" value="${escapeHtml(p.name)}">
+                    <input id="p-dur" class="swal2-input" placeholder="ระยะเวลา (เช่น 30 วัน)" value="${escapeHtml(p.duration)}">
+                    <input id="p-price" type="number" class="swal2-input" placeholder="ราคา (บาท)" value="${escapeHtml(p.price)}">
+                    <input id="p-img" class="swal2-input" placeholder="URL รูปภาพสินค้า" value="${escapeHtml(p.image)}">
+                    <textarea id="p-det" class="swal2-textarea" placeholder="รายละเอียดสินค้า">${escapeHtml(p.details)}</textarea>
+                    <textarea id="p-stock" class="swal2-textarea" placeholder="ข้อมูลสต๊อก/รหัส ที่จะส่งให้ลูกค้า">${escapeHtml(p.stock)}</textarea>
                 `,
-                showCancelButton: true, confirmButtonText: '<i class="fa-solid fa-save"></i> บันทึก', confirmButtonColor: '#0284c7',
+                showCancelButton: true, confirmButtonText: 'บันทึก', confirmButtonColor: '#0284c7',
                 preConfirm: () => {
+                    const name = document.getElementById('p-name').value.trim();
+                    const price = document.getElementById('p-price').value;
+                    // BUGFIX: เพิ่มการตรวจสอบขั้นต่ำก่อนบันทึกสินค้า (ชื่อและราคาต้องมีค่า และราคาต้องเป็นตัวเลข)
+                    if (!name) {
+                        Swal.showValidationMessage('กรุณากรอกชื่อสินค้า');
+                        return false;
+                    }
+                    if (price === '' || isNaN(parseFloat(price))) {
+                        Swal.showValidationMessage('กรุณากรอกราคาเป็นตัวเลข');
+                        return false;
+                    }
                     return {
-                        id: p.id, pin: currentAdminPin,
-                        name: document.getElementById('p-name').value,
-                        duration: document.getElementById('p-dur').value,
-                        price: document.getElementById('p-price').value,
-                        image: document.getElementById('p-img').value,
+                        id: id,
+                        name: name,
+                        duration: document.getElementById('p-dur').value.trim(),
+                        price: price,
+                        image: document.getElementById('p-img').value.trim(),
                         details: document.getElementById('p-det').value,
                         stock: document.getElementById('p-stock').value
                     }
                 }
-            }).then(async (res) => {
+            }).then((res) => {
                 if (res.isConfirmed) {
                     Swal.showLoading();
-                    try {
-                        await apiCall('adminSaveProduct', res.value);
-                        loadAdminData(); // Refresh UI
-                    } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+                    fetchData('adminSaveProduct', res.value, () => { window.location.reload(); });
                 }
             });
         }
@@ -726,25 +804,21 @@
         function deleteProduct(id) {
             Swal.fire({
                 title: 'ยืนยันลบสินค้า?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'ลบ'
-            }).then(async (res) => {
+            }).then((res) => {
                 if (res.isConfirmed) {
                     Swal.showLoading();
-                    try {
-                        await apiCall('adminDeleteProduct', { id: id, pin: currentAdminPin });
-                        loadAdminData();
-                    } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+                    fetchData('adminDeleteProduct', { id: id }, () => { window.location.reload(); });
                 }
             });
         }
 
-        async function saveAdminSettings() {
+        function saveAdminSettings() {
             const msg = document.getElementById('set-pop-msg').value;
             const img = document.getElementById('set-pop-img').value;
             Swal.showLoading();
-            try {
-                await apiCall('adminSaveSettings', { Popup_Message: msg, Popup_Image: img, pin: currentAdminPin });
+            fetchData('adminSaveSettings', { Popup_Message: msg, Popup_Image: img }, () => {
                 Swal.fire('สำเร็จ', 'บันทึกการตั้งค่าเรียบร้อย', 'success');
-            } catch (err) { Swal.fire('ผิดพลาด', err.message, 'error'); }
+            });
         }
     </script>
 </body>
