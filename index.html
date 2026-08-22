@@ -809,7 +809,14 @@
                 if (res.isConfirmed) {
                     if (!requireAdminSession()) return;
                     Swal.showLoading();
-                    fetchData('adminSaveProduct', res.value, () => { window.location.reload(); });
+                    // BUGFIX: เดิมใช้ window.location.reload() ซึ่งรีโหลดทั้งหน้าเว็บใหม่หมด
+                    // พอหน้าเว็บโหลดใหม่ window.onload จะพา showView('home') เสมอ (ตามโค้ด init)
+                    // ทำให้ดูเหมือน "เด้งออกจากหน้าแอดมิน" ทุกครั้งที่บันทึกสินค้าสำเร็จ
+                    // และ adminPin ที่เก็บไว้ในหน่วยความจำก็จะหายไปด้วย ต้องกรอก PIN ใหม่ทุกครั้ง
+                    // แก้เป็นดึงข้อมูลสินค้าล่าสุดมาอัปเดต แล้ว render หน้าแอดมินซ้ำแทน ไม่รีโหลดทั้งหน้า
+                    fetchData('adminSaveProduct', res.value, () => {
+                        refreshAdminData(id ? 'บันทึกการแก้ไขสินค้าเรียบร้อย' : 'เพิ่มสินค้าใหม่เรียบร้อย');
+                    });
                 }
             });
         }
@@ -821,7 +828,27 @@
                 if (res.isConfirmed) {
                     if (!requireAdminSession()) return;
                     Swal.showLoading();
-                    fetchData('adminDeleteProduct', { id: id, pin: adminPin }, () => { window.location.reload(); });
+                    // BUGFIX: เช่นเดียวกับ editProduct — ไม่ใช้ window.location.reload() แล้ว
+                    fetchData('adminDeleteProduct', { id: id, pin: adminPin }, () => {
+                        refreshAdminData('ลบสินค้าเรียบร้อย');
+                    });
+                }
+            });
+        }
+
+        // BUGFIX: ฟังก์ชันใหม่ — ดึงข้อมูลล่าสุดจาก backend มาอัปเดต globalData แล้วเรนเดอร์
+        // หน้าแอดมินซ้ำในที่เดิม แทนการรีโหลดทั้งหน้าเว็บ (window.location.reload()) ที่ทำให้
+        // เด้งกลับหน้าแรกและ PIN ที่ยืนยันไว้หายไปทุกครั้งที่บันทึก/ลบสินค้า
+        function refreshAdminData(successMessage) {
+            fetchData('init', {}, (res) => {
+                globalData = {
+                    products: (res && res.products) || [],
+                    settings: (res && res.settings) || {},
+                    orders: (res && res.orders) || []
+                };
+                showView('admin');
+                if (successMessage) {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: successMessage, showConfirmButton: false, timer: 1500 });
                 }
             });
         }
