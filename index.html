@@ -35,20 +35,70 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; color: #0f172a; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Prompt', sans-serif; background-color: transparent; color: #0f172a; -webkit-tap-highlight-color: transparent; }
 
-        /* กรอบเลเซอร์ขยับได้ */
-        .laser-card { position: relative; overflow: hidden; border-radius: 1rem; background: #ffffff; z-index: 0; }
+        /* ===================== พื้นหลังแสงฟ้า-ขาว-น้ำเงิน (Aurora Background) =====================
+           ใช้ transform + opacity ล้วนๆ (ไม่แตะ layout/width/height ระหว่างแอนิเมชัน) เพื่อให้เบราว์เซอร์
+           วาดผ่าน GPU compositor thread ได้ ทำให้เฟรมแอนิเมชันลื่นเต็มอัตรารีเฟรชของจอ (ปกติคือ 60Hz)
+           โดยไม่กระตุกแม้เปิดพร้อมกับแอนิเมชันอื่นบนหน้าเว็บ */
+        .aurora-bg {
+            position: fixed; inset: 0; z-index: -20; overflow: hidden;
+            background: linear-gradient(160deg, #eff6ff 0%, #ffffff 45%, #e0f2fe 100%);
+        }
+        .aurora-blob {
+            position: absolute; border-radius: 9999px; filter: blur(70px);
+            will-change: transform, opacity; mix-blend-mode: multiply;
+        }
+        .blob-sky   { width: 55vw; height: 55vw; top: -15%; left: -12%; background: #38bdf8; opacity: 0.45; animation: floatSky 16s ease-in-out infinite alternate; }
+        .blob-blue  { width: 48vw; height: 48vw; bottom: -18%; right: -10%; background: #0284c7; opacity: 0.35; animation: floatBlue 20s ease-in-out infinite alternate; }
+        .blob-navy  { width: 40vw; height: 40vw; top: 30%; right: 15%; background: #1d4ed8; opacity: 0.25; animation: floatNavy 24s ease-in-out infinite alternate; }
+        .blob-white { width: 35vw; height: 35vw; top: 10%; left: 35%; background: #ffffff; opacity: 0.55; mix-blend-mode: screen; animation: floatWhite 12s ease-in-out infinite alternate; }
+
+        @keyframes floatSky   { 0% { transform: translate(0, 0) scale(1); }   100% { transform: translate(12vw, 10vh) scale(1.15); } }
+        @keyframes floatBlue  { 0% { transform: translate(0, 0) scale(1); }   100% { transform: translate(-10vw, -8vh) scale(1.1); } }
+        @keyframes floatNavy  { 0% { transform: translate(0, 0) scale(0.9); } 100% { transform: translate(-8vw, 12vh) scale(1.05); } }
+        @keyframes floatWhite { 0% { transform: translate(0, 0) scale(1); }   100% { transform: translate(6vw, -6vh) scale(1.2); } }
+
+        /* แสงวิ่งพาดผ่านจอเบาๆ ให้ความรู้สึก "กำลังส่องแสง" อยู่ตลอดเวลา */
+        .aurora-sheen {
+            position: absolute; inset: -50% -50%; opacity: 0.5;
+            background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.9) 50%, transparent 60%);
+            animation: sheenMove 6s linear infinite;
+        }
+        @keyframes sheenMove { 0% { transform: translateX(-30%); } 100% { transform: translateX(30%); } }
+
+        @media (prefers-reduced-motion: reduce) {
+            .aurora-blob, .aurora-sheen { animation: none !important; }
+        }
+
+        /* ===================== การ์ดสินค้า: เอฟเฟกต์เลเซอร์ =====================
+           เดิมกรอบเลเซอร์จะโชว์เฉพาะตอน hover เท่านั้น (ใช้งานบนมือถือแทบไม่เห็นเอฟเฟกต์เลย เพราะไม่มี hover)
+           ปรับให้มีแสงเรืองแบบเบาๆ วิ่งวนอยู่ตลอดเวลา แล้วสว่างเต็มที่เมื่อแตะ/ชี้เมาส์ */
+        .laser-card {
+            position: relative; overflow: hidden; border-radius: 1rem; background: #ffffff; z-index: 0;
+            transition: box-shadow 0.4s ease, transform 0.25s ease;
+            box-shadow: 0 4px 20px -8px rgba(2, 132, 199, 0.25);
+        }
         .laser-card::before {
             content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-            background: conic-gradient(transparent, transparent, transparent, #0284c7);
-            animation: rotate 4s linear infinite; opacity: 0; transition: opacity 0.3s; z-index: -2;
+            background: conic-gradient(from 0deg, transparent 0%, #38bdf8 8%, #ffffff 16%, #1d4ed8 24%, transparent 34%);
+            animation: rotate 5s linear infinite; opacity: 0.55; transition: opacity 0.3s; z-index: -2;
         }
+        .laser-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px -10px rgba(2, 132, 199, 0.45); }
         .laser-card:hover::before { opacity: 1; }
         .laser-card::after {
             content: ''; position: absolute; inset: 2px; background: #ffffff; border-radius: 0.9rem; z-index: -1;
         }
         @keyframes rotate { 100% { transform: rotate(360deg); } }
+
+        /* ===================== แถบหมวดหมู่ ===================== */
+        .category-pill {
+            white-space: nowrap; transition: all 0.2s ease; border: 1px solid #e2e8f0;
+        }
+        .category-pill.active {
+            background: #0284c7; color: #ffffff; border-color: #0284c7;
+            box-shadow: 0 4px 14px -4px rgba(2, 132, 199, 0.5);
+        }
 
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
         .hide-scroll::-webkit-scrollbar { display: none; }
@@ -60,6 +110,15 @@
     </style>
 </head>
 <body class="antialiased pb-24 selection:bg-sky-100">
+
+    <!-- พื้นหลังแสงฟ้า-ขาว-น้ำเงิน แบบลอยตัวเบาๆ (aurora) -->
+    <div class="aurora-bg" aria-hidden="true">
+        <div class="aurora-blob blob-sky"></div>
+        <div class="aurora-blob blob-blue"></div>
+        <div class="aurora-blob blob-navy"></div>
+        <div class="aurora-blob blob-white"></div>
+        <div class="aurora-sheen"></div>
+    </div>
 
     <!-- Loading Screen -->
     <div id="loading" class="fixed inset-0 bg-white z-[999] flex flex-col items-center justify-center transition-opacity duration-300">
@@ -162,6 +221,45 @@
             return Math.round((parseFloat(n) || 0) * 100) / 100;
         }
 
+        // ===================== ระบบหมวดหมู่ (สร้างอัตโนมัติจากชื่อแอป) =====================
+        // ไม่ต้องแก้ Google Sheet เพิ่มคอลัมน์ใหม่ — เดาแนวหมวดหมู่จากคำที่พบในชื่อสินค้า (product.name)
+        // เรียงลำดับการเช็คตามนี้ ถ้าชื่อสินค้าตรงกับ keyword ของหมวดไหนก่อน จะถูกจัดเข้าอันนั้น
+        const CATEGORY_RULES = [
+            { key: 'streaming', label: 'สตรีมมิ่งหนัง/ซีรีส์', icon: 'fa-solid fa-tv',
+              keywords: ['netflix', 'disney', 'hbo', 'viu', 'wetv', 'iqiyi', 'trueid', 'primevideo', 'prime video', 'amazon prime', 'apple tv', 'appletv', 'hulu', 'monomax', 'ais play'] },
+            { key: 'music', label: 'เพลง/เสียง', icon: 'fa-solid fa-music',
+              keywords: ['spotify', 'youtube music', 'apple music', 'joox', 'soundcloud', 'tidal'] },
+            { key: 'video', label: 'วิดีโอ/ยูทูป', icon: 'fa-brands fa-youtube',
+              keywords: ['youtube premium', 'youtube', 'vimeo'] },
+            { key: 'ai', label: 'AI / ผู้ช่วยอัจฉริยะ', icon: 'fa-solid fa-robot',
+              keywords: ['chatgpt', 'gpt', 'gemini', 'claude', 'copilot', 'midjourney', 'perplexity', 'deepseek'] },
+            { key: 'design', label: 'ออกแบบ/ตัดต่อ', icon: 'fa-solid fa-palette',
+              keywords: ['canva', 'capcut', 'adobe', 'photoshop', 'premiere', 'lightroom', 'illustrator', 'figma'] },
+            { key: 'productivity', label: 'งาน/เอกสาร', icon: 'fa-solid fa-briefcase',
+              keywords: ['microsoft 365', 'office 365', 'google one', 'notion', 'icloud', 'onedrive', 'dropbox'] },
+            { key: 'game', label: 'เกม', icon: 'fa-solid fa-gamepad',
+              keywords: ['steam', 'garena', 'valorant', 'pubg', 'free fire', 'genshin', 'playstation', 'xbox'] }
+        ];
+        const OTHER_CATEGORY = { key: 'other', label: 'อื่นๆ', icon: 'fa-solid fa-layer-group' };
+
+        // BUGFIX-safe helper: คืนหมวดหมู่ของสินค้าจากชื่อ ไม่ทำให้พัง แม้ p.name จะว่าง/undefined
+        function getCategoryForProduct(p) {
+            const name = (p && p.name ? p.name : '').toLowerCase();
+            for (const cat of CATEGORY_RULES) {
+                if (cat.keywords.some(kw => name.includes(kw))) return cat;
+            }
+            return OTHER_CATEGORY;
+        }
+
+        // หมวดหมู่ที่กำลังเลือกอยู่บนหน้าแรก ('all' = แสดงทั้งหมด)
+        let currentCategory = 'all';
+
+        function setCategory(key) {
+            currentCategory = key;
+            // อัปเดตเฉพาะหน้าแรก ไม่ใช้ showView('home') ตรงๆ เพื่อไม่ให้จอเลื่อนกลับขึ้นบนทุกครั้งที่กดแท็บ
+            document.getElementById('app-container').innerHTML = renderHome();
+        }
+
         // --- Init Function ---
         window.onload = () => {
             checkBrowser();
@@ -249,8 +347,45 @@
             if (!globalData.products || globalData.products.length === 0) {
                 return `<div class="text-center py-20 text-slate-400"><i class="fa-solid fa-box-open text-5xl mb-3"></i><br>ยังไม่มีรายการสินค้าในขณะนี้</div>`;
             }
-            let html = `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-12">`;
-            globalData.products.forEach(p => {
+
+            // จับคู่สินค้าแต่ละชิ้นกับหมวดหมู่ (คำนวณครั้งเดียวต่อการ render แล้วใช้ต่อทั้งแท็บและกริด)
+            const productsWithCategory = globalData.products.map(p => ({ product: p, category: getCategoryForProduct(p) }));
+
+            // สร้างรายการแท็บหมวดหมู่เฉพาะหมวดที่ "มีสินค้าจริง" เท่านั้น พร้อมนับจำนวนสินค้าในแต่ละหมวด
+            const categoryCounts = {};
+            productsWithCategory.forEach(({ category }) => {
+                categoryCounts[category.key] = (categoryCounts[category.key] || 0) + 1;
+            });
+            const availableCategories = CATEGORY_RULES.concat([OTHER_CATEGORY]).filter(cat => categoryCounts[cat.key] > 0);
+
+            // ถ้าหมวดที่เลือกไว้ก่อนหน้านี้ไม่มีสินค้าอยู่แล้ว (เช่น สินค้าถูกลบไปหมด) ให้กลับไปแท็บ "ทั้งหมด" อัตโนมัติ
+            if (currentCategory !== 'all' && !categoryCounts[currentCategory]) {
+                currentCategory = 'all';
+            }
+
+            let tabsHtml = `<div class="flex gap-2 overflow-x-auto hide-scroll pb-3 mb-3 -mx-4 px-4">`;
+            tabsHtml += `
+                <button onclick="setCategory('all')" class="category-pill ${currentCategory === 'all' ? 'active' : 'bg-white text-slate-600'} px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5">
+                    <i class="fa-solid fa-grip"></i> ทั้งหมด (${globalData.products.length})
+                </button>`;
+            availableCategories.forEach(cat => {
+                tabsHtml += `
+                <button onclick="setCategory('${cat.key}')" class="category-pill ${currentCategory === cat.key ? 'active' : 'bg-white text-slate-600'} px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5">
+                    <i class="${cat.icon}"></i> ${escapeHtml(cat.label)} (${categoryCounts[cat.key]})
+                </button>`;
+            });
+            tabsHtml += `</div>`;
+
+            const visibleProducts = currentCategory === 'all'
+                ? productsWithCategory
+                : productsWithCategory.filter(({ category }) => category.key === currentCategory);
+
+            if (visibleProducts.length === 0) {
+                return tabsHtml + `<div class="text-center py-16 text-slate-400"><i class="fa-solid fa-box-open text-4xl mb-3"></i><br>ไม่มีสินค้าในหมวดหมู่นี้</div>`;
+            }
+
+            let html = tabsHtml + `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-12">`;
+            visibleProducts.forEach(({ product: p, category }) => {
                 // BUGFIX: escape ค่าทั้งหมดที่มาจาก backend ก่อนแทรกลง innerHTML (กัน XSS / HTML พัง)
                 const safeId = escapeHtml(p.id);
                 const safeName = escapeHtml(p.name);
@@ -258,8 +393,11 @@
                 const safeImage = escapeHtml(p.image || 'https://via.placeholder.com/200');
                 html += `
                 <div class="laser-card p-3 flex flex-col h-full border border-slate-100 shadow-sm">
-                    <div class="w-full h-32 md:h-40 bg-slate-50 rounded-lg overflow-hidden mb-3">
+                    <div class="w-full h-32 md:h-40 bg-slate-50 rounded-lg overflow-hidden mb-3 relative">
                         <img src="${safeImage}" class="w-full h-full object-cover" alt="${safeName}">
+                        <span class="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur text-slate-600 text-[9px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm">
+                            <i class="${category.icon}"></i> ${escapeHtml(category.label)}
+                        </span>
                     </div>
                     <h3 class="font-bold text-slate-800 text-sm md:text-base leading-snug line-clamp-1">${safeName}</h3>
                     <p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-clock mr-1"></i>${safeDuration}</p>
