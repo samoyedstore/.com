@@ -667,8 +667,14 @@
         }
 
         // --- Admin Dashboard ---
-        // หมายเหตุ (ความปลอดภัย): PIN ของแอดมินถูกเช็คฝั่ง client เท่านั้น (มองเห็นได้จากซอร์สโค้ด/Network tab)
-        // ควรย้ายการตรวจสอบ PIN ไปทำที่ฝั่ง Google Apps Script (backend) แทน เพื่อไม่ให้ใครก็ตามที่เปิดดูโค้ดสามารถหลบเลี่ยงได้
+        // BUGFIX (ความปลอดภัย): เดิม PIN ถูกเช็คฝั่ง client ตรงๆ (result.value === "1272304")
+        // ใครก็ตามที่เปิดดูซอร์สโค้ดในเบราว์เซอร์จะเห็น PIN และเรียก action adminSaveProduct/
+        // adminDeleteProduct/adminSaveSettings ข้ามหน้า Swal นี้ไปตรงๆ ได้เลยโดยไม่ต้องรู้ PIN
+        // เปลี่ยนให้ยืนยัน PIN ผ่าน backend (action 'adminLogin') แทน และเก็บ PIN ไว้ในตัวแปรนี้
+        // เฉพาะระหว่างที่หน้าเว็บยังเปิดอยู่ (ไม่บันทึกลง localStorage) เพื่อแนบไปกับทุกคำสั่งเขียนของแอดมิน
+        // ฝั่ง Google Apps Script จะเป็นผู้ตัดสินใจจริงว่า PIN ถูกหรือไม่
+        let adminPin = null;
+
         function checkAdmin() {
             Swal.fire({
                 title: 'เข้าสู่ระบบแอดมิน',
@@ -679,8 +685,13 @@
                 confirmButtonColor: '#0f172a'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    if (result.value === "1272304") { showView('admin'); }
-                    else { Swal.fire('ผิดพลาด', 'รหัส PIN ไม่ถูกต้อง', 'error'); }
+                    const pin = (result.value || '').trim();
+                    if (!pin) return Swal.fire('ผิดพลาด', 'กรุณากรอกรหัส PIN', 'warning');
+                    Swal.showLoading();
+                    fetchData('adminLogin', { pin: pin }, () => {
+                        adminPin = pin;
+                        showView('admin');
+                    });
                 }
             });
         }
@@ -790,11 +801,13 @@
                         price: price,
                         image: document.getElementById('p-img').value.trim(),
                         details: document.getElementById('p-det').value,
-                        stock: document.getElementById('p-stock').value
+                        stock: document.getElementById('p-stock').value,
+                        pin: adminPin // BUGFIX: แนบ PIN ที่ยืนยันไว้แล้วไปกับคำสั่งเขียน เพื่อให้ backend ตรวจสอบสิทธิ์อีกครั้ง
                     }
                 }
             }).then((res) => {
                 if (res.isConfirmed) {
+                    if (!requireAdminSession()) return;
                     Swal.showLoading();
                     fetchData('adminSaveProduct', res.value, () => { window.location.reload(); });
                 }
@@ -806,19 +819,31 @@
                 title: 'ยืนยันลบสินค้า?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'ลบ'
             }).then((res) => {
                 if (res.isConfirmed) {
+                    if (!requireAdminSession()) return;
                     Swal.showLoading();
-                    fetchData('adminDeleteProduct', { id: id }, () => { window.location.reload(); });
+                    fetchData('adminDeleteProduct', { id: id, pin: adminPin }, () => { window.location.reload(); });
                 }
             });
         }
 
         function saveAdminSettings() {
+            if (!requireAdminSession()) return;
             const msg = document.getElementById('set-pop-msg').value;
             const img = document.getElementById('set-pop-img').value;
             Swal.showLoading();
-            fetchData('adminSaveSettings', { Popup_Message: msg, Popup_Image: img }, () => {
+            fetchData('adminSaveSettings', { Popup_Message: msg, Popup_Image: img, pin: adminPin }, () => {
                 Swal.fire('สำเร็จ', 'บันทึกการตั้งค่าเรียบร้อย', 'success');
             });
+        }
+
+        // BUGFIX: กันเคสที่ adminPin หาย (เช่น รีเฟรชหน้าเว็บระหว่างอยู่ในแผงแอดมิน ตัวแปรในหน่วยความจำจะถูกล้าง)
+        // ถ้าไม่มี adminPin เก็บไว้ ให้พาไปยืนยัน PIN ใหม่ก่อน แทนที่จะปล่อยให้ backend ปฏิเสธแบบไม่มีคำอธิบาย
+        function requireAdminSession() {
+            if (!adminPin) {
+                Swal.fire('หมดเวลาเซสชัน', 'กรุณายืนยันรหัส PIN แอดมินอีกครั้ง', 'warning').then(() => checkAdmin());
+                return false;
+            }
+            return true;
         }
     </script>
 </body>
