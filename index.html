@@ -555,9 +555,14 @@
                     <span class="text-lg text-primary">${formatMoney(total)} บาท</span>
                 </div>
 
+                <div class="mb-4 p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs flex items-start gap-2">
+                    <i class="fa-solid fa-circle-check mt-0.5"></i>
+                    <span>ระบบจะส่งมอบสินค้าให้ทันทีบนหน้านี้หลังยืนยันการชำระเงิน และดูย้อนหลังได้ที่เมนู "ประวัติสั่งซื้อ" ตลอดเวลา ไม่ต้องรอรับทางอีเมล</span>
+                </div>
+
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">อีเมลรับสินค้า <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">อีเมลสำหรับผูกบัญชี/ติดต่อ <span class="text-red-500">*</span></label>
                         <input type="email" id="chk-email" value="${escapeHtml(userEmail)}" class="w-full border rounded-xl p-3 text-sm outline-none focus:border-primary" placeholder="example@email.com">
                     </div>
 
@@ -643,9 +648,18 @@
         }
 
         // --- Receipt Display & Download ---
+        // BUGFIX: สินค้าจะแสดง "บนเว็บ" ทันทีในหน้านี้ (ไม่ใช่ส่งไปทางอีเมลแล้วให้ลูกค้ารอเปิดอีเมล)
+        // และยังดูย้อนหลังได้อีกครั้งจากเมนู "ประวัติสั่งซื้อ" (ดู renderHistory ด้านล่าง)
         function showReceipt(orderData) {
             const deliveryItems = (orderData && orderData.deliveryItems) || []; // BUGFIX: กัน deliveryItems undefined
-            let itemsHtml = deliveryItems.map(txt => `<div class="bg-slate-50 border p-2.5 rounded-lg text-xs font-mono mb-2 text-slate-700">${escapeHtml(txt)}</div>`).join('');
+            let itemsHtml = deliveryItems.map((txt, idx) => `
+                <div class="flex items-center gap-2 bg-slate-50 border p-2.5 rounded-lg mb-2">
+                    <div class="flex-1 min-w-0 text-xs font-mono text-slate-700 break-all">${escapeHtml(txt)}</div>
+                    <button onclick="copyDeliveryText(${idx})" class="text-slate-400 hover:text-primary shrink-0 p-1" title="คัดลอก"><i class="fa-regular fa-copy"></i></button>
+                </div>`).join('');
+
+            // เก็บข้อความไว้ในตัวแปรกลาง เพื่อให้ปุ่มคัดลอกเรียกใช้ได้โดยไม่ต้องยุ่งกับการ escape ใน onclick
+            window.__deliveryItemsForCopy = deliveryItems;
 
             const html = `
             <div id="receipt-box" class="p-6 bg-white max-w-sm mx-auto rounded-xl border text-left" style="font-family: 'Prompt', sans-serif;">
@@ -657,17 +671,32 @@
                 </div>
                 <hr class="border-dashed my-3">
                 <div class="mb-3">
-                    <h3 class="font-bold text-xs text-primary mb-2"><i class="fa-solid fa-box"></i> ข้อมูลสินค้าที่ได้รับ:</h3>
-                    ${itemsHtml}
+                    <h3 class="font-bold text-xs text-primary mb-2"><i class="fa-solid fa-box"></i> ข้อมูลสินค้าที่ได้รับ (ส่งมอบบนเว็บทันที):</h3>
+                    ${itemsHtml || `<p class="text-xs text-slate-400">ไม่มีข้อมูลสินค้าที่ต้องแสดง</p>`}
                 </div>
                 <hr class="border-dashed my-3">
-                <p class="text-center text-xs text-slate-400">ชำระเงินเรียบร้อยแล้ว ขอบคุณที่ใช้อุดหนุนค่ะ</p>
+                <p class="text-center text-xs text-slate-400">ชำระเงินเรียบร้อยแล้ว ดูข้อมูลนี้ซ้ำได้ที่เมนู "ประวัติสั่งซื้อ" ขอบคุณที่ใช้อุดหนุนค่ะ</p>
             </div>
             <button onclick="downloadReceipt()" class="mt-4 w-full bg-primary text-white py-2.5 rounded-xl font-medium text-xs shadow-sm"><i class="fa-solid fa-download mr-1"></i> บันทึกใบเสร็จ (.png)</button>
             <button onclick="Swal.close(); showView('home')" class="mt-2 w-full bg-slate-100 text-slate-700 py-2.5 rounded-xl font-medium text-xs">กลับสู่หน้าแรก</button>
             `;
 
             Swal.fire({ html: html, showConfirmButton: false, allowOutsideClick: false, width: '380px' });
+        }
+
+        // BUGFIX: ฟังก์ชันคัดลอกข้อมูลสินค้า (เช่น รหัส/บัญชี) แต่ละบรรทัดไปยัง clipboard
+        // เพื่อให้ลูกค้าเอาไปวางใช้งานต่อได้ทันทีจากหน้าเว็บ โดยไม่ต้องเปิดอีเมล
+        function copyDeliveryText(idx) {
+            const items = window.__deliveryItemsForCopy || [];
+            const text = items[idx];
+            if (text === undefined) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'คัดลอกแล้ว', showConfirmButton: false, timer: 1000 });
+                }).catch(() => {
+                    Swal.fire('คัดลอกไม่สำเร็จ', 'กรุณาคัดลอกด้วยตนเอง', 'warning');
+                });
+            }
         }
 
         function downloadReceipt() {
@@ -799,11 +828,16 @@
             });
         }
 
+        // BUGFIX: เก็บออเดอร์ล่าสุดที่โหลดมาไว้ในตัวแปรกลาง เพื่อให้ปุ่ม "ดูข้อมูลสินค้า"
+        // ในประวัติสั่งซื้อเรียกดูรหัส/บัญชีที่ได้รับซ้ำได้จากหน้าเว็บโดยตรง ไม่ต้องพึ่งอีเมล
+        let historyOrders = [];
+
         function renderHistory(orders) {
+            historyOrders = orders || [];
             if (!orders || orders.length === 0) {
                 return `<div class="max-w-md mx-auto text-center py-20 text-slate-400"><i class="fa-solid fa-clock-rotate-left text-5xl mb-3"></i><br>ยังไม่มีประวัติการสั่งซื้อ</div>`;
             }
-            let listHtml = orders.map(o => {
+            let listHtml = orders.map((o, idx) => {
                 const items = o.items || []; // BUGFIX: กัน o.items undefined ทำให้ .map error
                 let itemsStr = items.map(i => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] mr-1 mb-1">${escapeHtml(i.name)}</span>`).join('');
                 return `
@@ -813,10 +847,13 @@
                         <span class="text-[10px] text-slate-400">${new Date(o.date).toLocaleDateString('th-TH')}</span>
                     </div>
                     <div class="mb-2">${itemsStr}</div>
-                    <div class="flex justify-between items-center text-xs font-bold pt-2 border-t">
+                    <div class="flex justify-between items-center text-xs font-bold pt-2 border-t mb-2">
                         <span>ยอดรวม</span>
                         <span class="text-slate-800">${formatMoney(o.total)} ฿</span>
                     </div>
+                    <button onclick="viewHistoryDelivery(${idx})" class="w-full bg-slate-900 hover:bg-black text-white py-2 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-box-open text-xs"></i> ดูข้อมูลสินค้าที่ได้รับ
+                    </button>
                 </div>`;
             }).join('');
 
@@ -825,6 +862,15 @@
                 <h2 class="text-base font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-receipt text-primary"></i> ประวัติการสั่งซื้อของคุณ</h2>
                 ${listHtml}
             </div>`;
+        }
+
+        // BUGFIX: เปิดดูข้อมูลสินค้า (รหัส/บัญชี) ของออเดอร์เก่าซ้ำได้จากหน้าประวัติสั่งซื้อ
+        // โดยใช้ modal เดียวกับตอนซื้อสำเร็จ (showReceipt) — ทำให้ลูกค้ากลับมาดูสินค้าที่เคยได้รับ
+        // ได้ตลอดเวลาจากหน้าเว็บ ไม่ต้องค้นหาในอีเมลเก่า
+        function viewHistoryDelivery(idx) {
+            const order = historyOrders[idx];
+            if (!order) return;
+            showReceipt(order);
         }
 
         // --- Contact Admin Modal ---
