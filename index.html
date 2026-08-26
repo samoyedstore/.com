@@ -207,7 +207,7 @@
     <script>
         // ================= CONFIGURATION =================
         // *** วาง URL ของ Web App จาก Google Apps Script ที่นี่ ***
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQPJmebLc_UYPFUsVJgJl2H0naxu_FMCR4ykTU4z4waZl6yQ4QdhOUiOFIcJGFVJpm/exec";
+        const WEB_APP_URL = "YOUR_WEB_APP_URL_HERE";
         // =================================================
 
         let globalData = { products: [], settings: {}, orders: [] };
@@ -238,6 +238,23 @@
             return Math.round((parseFloat(n) || 0) * 100) / 100;
         }
 
+        // ===================== ระบบนับจำนวนสต๊อกสินค้า =====================
+        // เดิมหน้าเว็บไม่แสดงจำนวนสต๊อก/สถานะสินค้าหมดเลย ทำให้ลูกค้ากดสั่งซื้อสินค้าที่หมดแล้วได้
+        // ฟิลด์เก็บรหัส/บัญชี (จากช่อง "ข้อมูลสต๊อก/รหัส ที่จะส่งให้ลูกค้า" ในหน้าแอดมิน) เก็บไว้บรรทัดละ 1 ชุด
+        // จึงใช้ "จำนวนบรรทัดที่ไม่ว่าง" เป็นจำนวนสต๊อกคงเหลือของสินค้านั้นๆ โดยอัตโนมัติ ไม่ต้องเพิ่มคอลัมน์ใหม่ใน Sheet
+        // BUGFIX: บาง Google Sheet/Apps Script backend อาจส่งชื่อฟิลด์มาไม่ตรงตัวพิมพ์เล็ก-ใหญ่ทุกครั้ง
+        // (เช่น Stock, STOCK, stock_data) จึงเช็คหลายชื่อฟิลด์ที่เป็นไปได้กันไว้ ไม่ให้ค่าตกหล่นจนกลายเป็น "สินค้าหมด" ทั้งที่มีจริง
+        function getStockCount(p) {
+            if (!p) return 0;
+            const raw = p.stock ?? p.Stock ?? p.STOCK ?? p.stock_data ?? p.stockData ?? '';
+            return String(raw).split(/\r?\n/).map(s => s.trim()).filter(Boolean).length;
+        }
+
+        // นับจำนวนสินค้าชิ้นนี้ (ตาม id) ที่ถูกใส่ไว้ในตะกร้าแล้ว เพื่อกันไม่ให้กดเพิ่มเกินจำนวนสต๊อกที่มีจริง
+        function cartCountForId(id) {
+            return cart.filter(x => x.id === id).length;
+        }
+
         // ===================== จัดกลุ่มสินค้า (ตามชื่อสินค้าโดยตรง ไม่แยกหมวดสตรีมมิ่ง/เพลง/AI ฯลฯ) =====================
         // การ์ดหน้าแรกจะสร้างขึ้นจาก "ชื่อสินค้า" ตรงๆ — สินค้าที่ชื่อเดียวกัน (เช่นต่างระยะเวลา/แพ็กเกจ)
         // จะถูกรวมเป็นการ์ดเดียวกันโดยอัตโนมัติ ไม่ต้องตั้งหมวดหมู่แยกเอง
@@ -266,13 +283,14 @@
             return escapeHtml(jsEscaped);
         }
 
-        // จัดกลุ่มสินค้าทั้งหมดตามชื่อ (product.name) คืนค่าเป็น object: { ชื่อสินค้า: { count, image } }
+        // จัดกลุ่มสินค้าทั้งหมดตามชื่อ (product.name) คืนค่าเป็น object: { ชื่อสินค้า: { count, image, totalStock } }
         function groupProductsByName(products) {
             const groups = {};
             products.forEach(p => {
                 const key = (p && p.name ? p.name.trim() : '') || 'ไม่ระบุชื่อสินค้า';
-                if (!groups[key]) groups[key] = { count: 0, image: '' };
+                if (!groups[key]) groups[key] = { count: 0, image: '', totalStock: 0 };
                 groups[key].count++;
+                groups[key].totalStock += getStockCount(p); // BUGFIX: รวมจำนวนสต๊อกของทุกแพ็กเกจในกลุ่มชื่อเดียวกัน
                 if (!groups[key].image && p && p.image) groups[key].image = p.image;
             });
             return groups;
@@ -397,10 +415,13 @@
                     <div class="cat-card">
                         <div class="cat-banner" style="${bannerStyle}">
                             ${g.image ? '' : `<i class="fa-solid fa-box cat-banner-icon"></i>`}
+                            ${g.totalStock > 0
+                                ? `<span class="absolute top-2 right-2 bg-emerald-500/90 backdrop-blur text-white text-[10px] px-2.5 py-1 rounded-full font-medium shadow-sm">คงเหลือ ${g.totalStock} ชิ้น</span>`
+                                : `<span class="absolute top-2 right-2 bg-red-500/90 backdrop-blur text-white text-[10px] px-2.5 py-1 rounded-full font-medium shadow-sm">สินค้าหมด</span>`}
                         </div>
                         <div class="p-4">
                             <h3 class="font-bold text-slate-800 text-base leading-snug line-clamp-1">${escapeHtml(name)}</h3>
-                            <p class="text-xs text-slate-400 mt-1">มีสินค้าทั้งหมด ${g.count} ชิ้น</p>
+                            <p class="text-xs text-slate-400 mt-1">มีสินค้าทั้งหมด ${g.count} รายการ · คงเหลือ ${g.totalStock} ชิ้น</p>
                             <button onclick="setCategory('${jsAttr(name)}')" class="mt-3 w-full bg-primary hover:bg-sky-700 text-white py-2.5 rounded-xl text-sm font-medium transition">
                                 สินค้าทั้งหมด
                             </button>
@@ -438,21 +459,37 @@
                 const safeName = escapeHtml(p.name);
                 const safeDuration = escapeHtml(p.duration);
                 const safeImage = escapeHtml(p.image || 'https://via.placeholder.com/200');
+
+                // BUGFIX: คำนวณจำนวนสต๊อกคงเหลือ แล้วแสดงป้ายสถานะ + ปิดการกดเพิ่มลงตะกร้าเมื่อสินค้าหมด
+                const stockCount = getStockCount(p);
+                const inStock = stockCount > 0;
+                const stockBadge = inStock
+                    ? `<span class="absolute top-1.5 right-1.5 bg-emerald-500/90 backdrop-blur text-white text-[9px] px-2 py-0.5 rounded-full font-medium shadow-sm">คงเหลือ ${stockCount} ชิ้น</span>`
+                    : `<span class="absolute top-1.5 right-1.5 bg-red-500/90 backdrop-blur text-white text-[9px] px-2 py-0.5 rounded-full font-medium shadow-sm">สินค้าหมด</span>`;
+
                 html += `
-                <div class="laser-card p-3 flex flex-col h-full border border-slate-100 shadow-sm">
+                <div class="laser-card p-3 flex flex-col h-full border border-slate-100 shadow-sm ${inStock ? '' : 'opacity-70'}">
                     <div class="w-full h-32 md:h-40 bg-slate-50 rounded-lg overflow-hidden mb-3 relative">
                         <img src="${safeImage}" class="w-full h-full object-cover" alt="${safeName}">
+                        ${stockBadge}
                     </div>
                     <h3 class="font-bold text-slate-800 text-sm md:text-base leading-snug line-clamp-1">${safeName}</h3>
                     <p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-clock mr-1"></i>${safeDuration}</p>
+                    <p class="text-xs mt-1 font-semibold ${inStock ? 'text-emerald-600' : 'text-red-500'}">
+                        <i class="fa-solid ${inStock ? 'fa-circle-check' : 'fa-circle-xmark'} mr-1"></i>${inStock ? `คงเหลือ ${stockCount} ชิ้น` : 'สินค้าหมด'}
+                    </p>
                     <div class="mt-auto pt-3">
                         <div class="flex items-end justify-between mb-3">
                             <span class="text-primary font-bold text-base md:text-lg">${formatMoney(p.price)} ฿</span>
                             <button onclick="showDetails('${safeId}')" class="text-xs text-slate-400 hover:text-slate-600 underline">รายละเอียด</button>
                         </div>
+                        ${inStock ? `
                         <button onclick="addToCart('${safeId}')" class="w-full bg-slate-900 hover:bg-black text-white py-2 rounded-lg text-xs md:text-sm font-medium transition flex items-center justify-center gap-1.5">
                             <i class="fa-solid fa-plus text-xs"></i> เพิ่มลงตะกร้า
-                        </button>
+                        </button>` : `
+                        <button disabled class="w-full bg-slate-200 text-slate-400 py-2 rounded-lg text-xs md:text-sm font-medium cursor-not-allowed flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-ban text-xs"></i> สินค้าหมด
+                        </button>`}
                     </div>
                 </div>`;
             });
@@ -475,6 +512,18 @@
         function addToCart(id) {
             const p = globalData.products.find(x => x.id === id);
             if (!p) return; // BUGFIX: กันเคสหา product ไม่เจอ
+
+            // BUGFIX: ตรวจสอบจำนวนสต๊อกคงเหลือก่อนเพิ่มลงตะกร้าเสมอ (เผื่อข้อมูลสินค้าเพิ่งรีเฟรชใหม่
+            // หรือมีคนอื่นกดสั่งซื้อไปพร้อมกันจนสต๊อกเปลี่ยน) และกันไม่ให้กดเพิ่มสินค้าชิ้นเดียวกัน
+            // เกินจำนวนสต๊อกที่มีจริงเข้าไปในตะกร้า
+            const stockCount = getStockCount(p);
+            if (stockCount <= 0) {
+                return Swal.fire('สินค้าหมด', 'ขออภัย สินค้านี้หมดสต๊อกแล้ว', 'warning');
+            }
+            if (cartCountForId(id) >= stockCount) {
+                return Swal.fire('สต๊อกไม่พอ', `มีสินค้านี้คงเหลือเพียง ${stockCount} ชิ้น และอยู่ในตะกร้าครบจำนวนแล้ว`, 'warning');
+            }
+
             // BUGFIX: เดิมใช้ Date.now() อย่างเดียวเป็น cartId ถ้ากดเพิ่มสินค้าเร็วมากๆ ภายใน 1ms เดียวกัน
             // จะได้ cartId ซ้ำกัน ทำให้ removeCart ลบสินค้าผิดชิ้น/ลบซ้ำสองชิ้นพร้อมกัน
             const cartId = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -666,7 +715,7 @@
                 <div class="text-center mb-4">
                     <img src="https://i.postimg.cc/525qrvD9/IMG-7296.jpg" class="w-14 h-14 mx-auto rounded-full mb-2">
                     <h2 class="font-bold text-base">ใบเสร็จรับเงิน</h2>
-                    <p class="text-[10px] text-slate-400">หมาหมอยด์ Premium</p>
+                    <p class="text-[10px] text-slate-400">หมามอยด์ Premium</p>
                     <p class="text-[10px] text-slate-400 mt-1">Order ID: ${escapeHtml(orderData && orderData.orderId)}</p>
                 </div>
                 <hr class="border-dashed my-3">
@@ -929,16 +978,23 @@
             const orders = globalData.orders || [];      // BUGFIX: กัน undefined
             const settings = globalData.settings || {};  // BUGFIX: กัน undefined
 
-            let pRows = products.map(p => `
+            let pRows = products.map(p => {
+                const stockCount = getStockCount(p); // BUGFIX: แสดงจำนวนสต๊อกคงเหลือในตารางแอดมินด้วย เพื่อให้เติมสต๊อกได้ทันเวลา
+                const stockLabel = stockCount > 0
+                    ? `<span class="text-emerald-600 font-semibold">${stockCount}</span>`
+                    : `<span class="text-red-500 font-semibold">หมด</span>`;
+                return `
                 <tr class="border-b text-xs">
                     <td class="p-2"><img src="${escapeHtml(p.image)}" class="w-8 h-8 rounded object-cover"></td>
                     <td class="p-2 font-medium">${escapeHtml(p.name)}</td>
                     <td class="p-2">${formatMoney(p.price)}</td>
+                    <td class="p-2">${stockLabel}</td>
                     <td class="p-2">
                         <button onclick="editProduct('${escapeHtml(p.id)}')" class="text-sky-600 mr-2"><i class="fa-solid fa-pen"></i></button>
                         <button onclick="deleteProduct('${escapeHtml(p.id)}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button>
                     </td>
-                </tr>`).join('');
+                </tr>`;
+            }).join('');
 
             let oRows = orders.map(o => `
                 <tr class="border-b text-[11px]">
@@ -963,7 +1019,7 @@
                     <div class="overflow-x-auto border rounded-xl">
                         <table class="w-full text-left border-collapse">
                             <thead><tr class="bg-slate-50 text-slate-500 text-xs">
-                                <th class="p-2">รูป</th><th class="p-2">ชื่อ</th><th class="p-2">ราคา</th><th class="p-2">จัดการ</th>
+                                <th class="p-2">รูป</th><th class="p-2">ชื่อ</th><th class="p-2">ราคา</th><th class="p-2">สต๊อก</th><th class="p-2">จัดการ</th>
                             </tr></thead>
                             <tbody>${pRows}</tbody>
                         </table>
