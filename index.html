@@ -509,7 +509,24 @@
         }
 
         // --- Cart Management ---
+        // BUGFIX: เพิ่มการบังคับเข้าสู่ระบบก่อนทำรายการใดๆ (เพิ่มสินค้าลงตะกร้า/สั่งซื้อ)
+        // เดิมผู้ใช้ที่ยังไม่ login สามารถกดเพิ่มสินค้าและไปจนถึงหน้าชำระเงินได้เลย
+        function requireUserLogin() {
+            if (!currentUser) {
+                Swal.fire({
+                    title: 'กรุณาเข้าสู่ระบบก่อน',
+                    text: 'ต้องเข้าสู่ระบบก่อนจึงจะสามารถทำรายการสั่งซื้อสินค้าได้',
+                    icon: 'warning',
+                    confirmButtonText: 'เข้าสู่ระบบ',
+                    confirmButtonColor: '#0284c7'
+                }).then(() => openAuthModal());
+                return false;
+            }
+            return true;
+        }
+
         function addToCart(id) {
+            if (!requireUserLogin()) return; // BUGFIX: ต้อง login ก่อนจึงจะเพิ่มสินค้าลงตะกร้าได้
             const p = globalData.products.find(x => x.id === id);
             if (!p) return; // BUGFIX: กันเคสหา product ไม่เจอ
 
@@ -579,6 +596,7 @@
         }
 
         function goToCheckout() {
+            if (!requireUserLogin()) return; // BUGFIX: ต้อง login ก่อนจึงจะไปหน้าชำระเงินได้
             if (cart.length === 0) return Swal.fire('ตะกร้าว่างเปล่า', 'กรุณาเลือกสินค้าอย่างน้อย 1 ชิ้น', 'warning');
             toggleCart(); showView('checkout');
         }
@@ -676,6 +694,7 @@
         }
 
         function submitCheckout() {
+            if (!requireUserLogin()) return; // BUGFIX: กันชั้นสุดท้าย เผื่อมีคนเข้าหน้าชำระเงินมาโดยไม่ผ่าน goToCheckout
             const email = document.getElementById('chk-email').value.trim();
             // BUGFIX: เดิมเช็คแค่ email.includes('@') ซึ่งผ่านได้แม้กรอกแค่ "a@" หรือ "@@@"
             // เปลี่ยนเป็น regex ตรวจรูปแบบอีเมลที่สมเหตุสมผลกว่า
@@ -1049,12 +1068,44 @@
             </div>`;
         }
 
+        // BUGFIX: เปลี่ยนรูปแบบกรอกสต๊อกจาก textarea ก้อนเดียว (พิมพ์รวมกันแล้วนับบรรทัด)
+        // เป็น "1 กล่องข้อความ = 1 สต๊อก" แยกทีละช่อง เพิ่มได้ไม่จำกัดจำนวน เพื่อกันการกรอกผิดบรรทัด/เผลอเว้นบรรทัดว่าง
+        // จนนับสต๊อกผิดพลาด ส่วนการเก็บข้อมูลจริงยังคงเป็น string คั่นด้วยขึ้นบรรทัดใหม่เหมือนเดิม (ไม่กระทบ backend/getStockCount)
+        function renderStockBoxRow(value) {
+            return `<div class="flex items-center gap-2 mb-2" data-stock-row>
+                <input type="text" class="swal2-input stock-box-input" style="margin:0;flex:1;" placeholder="รหัส/บัญชี 1 ชุด (เช่น email:password)" value="${escapeHtml(value)}">
+                <button type="button" onclick="removeStockBoxRow(this)" class="text-red-500 hover:text-red-700 px-2 shrink-0"><i class="fa-solid fa-trash-can"></i></button>
+            </div>`;
+        }
+
+        function addStockBoxRow() {
+            const container = document.getElementById('stock-boxes-list');
+            if (!container) return;
+            container.insertAdjacentHTML('beforeend', renderStockBoxRow(''));
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeStockBoxRow(btn) {
+            const row = btn.closest('[data-stock-row]');
+            const container = document.getElementById('stock-boxes-list');
+            // ต้องเหลืออย่างน้อย 1 กล่องเสมอ ไม่ให้ลบจนหมด (กันฟอร์มพัง/สับสน)
+            if (row && container && container.querySelectorAll('[data-stock-row]').length > 1) {
+                row.remove();
+            } else if (row) {
+                row.querySelector('.stock-box-input').value = '';
+            }
+        }
+
         function editProduct(id) {
             let p = id ? globalData.products.find(x => x.id === id) : { id: '', name: '', duration: '', price: '', image: '', details: '', stock: '' };
             if (id && !p) { // BUGFIX: กันเคสหา product ไม่เจอ (เช่นข้อมูลถูกลบไปแล้วแต่ตารางยังไม่รีเฟรช)
                 Swal.fire('ไม่พบสินค้า', 'ไม่พบสินค้านี้ในระบบ อาจถูกลบไปแล้ว', 'warning');
                 return;
             }
+            // BUGFIX: แปลงข้อมูลสต๊อกเดิม (คั่นด้วยขึ้นบรรทัดใหม่) กลับมาเป็นรายการกล่องข้อความทีละชุด
+            let existingStock = String(p.stock || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            if (existingStock.length === 0) existingStock = ['']; // เริ่มต้นให้มีอย่างน้อย 1 กล่องเสมอ
+
             Swal.fire({
                 title: id ? 'แก้ไขสินค้า' : 'เพิ่มสินค้าใหม่',
                 html: `
@@ -1063,7 +1114,13 @@
                     <input id="p-price" type="number" class="swal2-input" placeholder="ราคา (บาท)" value="${escapeHtml(p.price)}">
                     <input id="p-img" class="swal2-input" placeholder="URL รูปภาพสินค้า" value="${escapeHtml(p.image)}">
                     <textarea id="p-det" class="swal2-textarea" placeholder="รายละเอียดสินค้า">${escapeHtml(p.details)}</textarea>
-                    <textarea id="p-stock" class="swal2-textarea" placeholder="ข้อมูลสต๊อก/รหัส ที่จะส่งให้ลูกค้า">${escapeHtml(p.stock)}</textarea>
+                    <div class="text-left text-xs font-semibold text-slate-600 mt-3 mb-1">ข้อมูลสต๊อก (1 กล่องข้อความ = 1 สต๊อก เพิ่มได้ไม่จำกัด)</div>
+                    <div id="stock-boxes-list" class="text-left" style="max-height:220px;overflow-y:auto;padding-right:4px;">
+                        ${existingStock.map(v => renderStockBoxRow(v)).join('')}
+                    </div>
+                    <button type="button" onclick="addStockBoxRow()" class="swal2-styled" style="background:#0284c7;font-size:12px;padding:6px 16px;margin-top:6px;">
+                        <i class="fa-solid fa-plus"></i> เพิ่มสต๊อก
+                    </button>
                 `,
                 showCancelButton: true, confirmButtonText: 'บันทึก', confirmButtonColor: '#0284c7',
                 preConfirm: () => {
@@ -1078,6 +1135,11 @@
                         Swal.showValidationMessage('กรุณากรอกราคาเป็นตัวเลข');
                         return false;
                     }
+                    // BUGFIX: รวบรวมค่าจากทุกกล่องสต๊อก (ตัดช่องว่าง/กล่องว่างทิ้ง) แล้วต่อกลับเป็น string
+                    // คั่นด้วยขึ้นบรรทัดใหม่ เพื่อให้ backend และ getStockCount() ใช้งานได้เหมือนเดิมโดยไม่ต้องแก้โครงสร้างข้อมูล
+                    const stockValues = Array.from(document.querySelectorAll('#stock-boxes-list .stock-box-input'))
+                        .map(inp => inp.value.trim())
+                        .filter(Boolean);
                     return {
                         id: id,
                         name: name,
@@ -1085,7 +1147,7 @@
                         price: price,
                         image: document.getElementById('p-img').value.trim(),
                         details: document.getElementById('p-det').value,
-                        stock: document.getElementById('p-stock').value,
+                        stock: stockValues.join('\n'),
                         pin: adminPin // BUGFIX: แนบ PIN ที่ยืนยันไว้แล้วไปกับคำสั่งเขียน เพื่อให้ backend ตรวจสอบสิทธิ์อีกครั้ง
                     }
                 }
